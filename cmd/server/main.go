@@ -1,9 +1,9 @@
 package main
 
 import (
-    "log"
+    "github.com/20TB-ZipBomb/GGJ_Platform/pkg/app"
 )
 
 func main() {
-    log.Println("Hello, World")
+    app.Run()
 }
