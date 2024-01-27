@@ -12,8 +12,8 @@ import (
 var sugar *zap.SugaredLogger
 
 func Init() {
-	config := UseEnvConfig()
-	encoderConfig := UseEnvEncoderConfig()
+	config := useEnvConfig()
+	encoderConfig := useEnvEncoderConfig()
 	encoderConfig.StacktraceKey = ""
 	encoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.DateTime)
 	config.EncoderConfig = encoderConfig
@@ -28,22 +28,6 @@ func Init() {
 
 func Sync() {
 	sugar.Sync()
-}
-
-func UseEnvConfig() zap.Config {
-	if utils.IsProductionEnv() {
-		return zap.NewProductionConfig()
-	}
-
-	return zap.NewDevelopmentConfig()
-}
-
-func UseEnvEncoderConfig() zapcore.EncoderConfig {
-	if utils.IsProductionEnv() {
-		return zap.NewProductionEncoderConfig()
-	}
-
-	return zap.NewDevelopmentEncoderConfig()
 }
 
 func Info(args ...interface{}) {
@@ -76,4 +60,20 @@ func Fatal(args ...interface{}) {
 
 func Fatalf(template string, args ...interface{}) {
 	sugar.Fatalf(template, args...)
+}
+
+func useEnvConfig() zap.Config {
+	if utils.IsProductionEnv() {
+		return zap.NewProductionConfig()
+	}
+
+	return zap.NewDevelopmentConfig()
+}
+
+func useEnvEncoderConfig() zapcore.EncoderConfig {
+	if utils.IsProductionEnv() {
+		return zap.NewProductionEncoderConfig()
+	}
+
+	return zap.NewDevelopmentEncoderConfig()
 }

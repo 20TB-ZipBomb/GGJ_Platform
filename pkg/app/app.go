@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/20TB-ZipBomb/GGJ_Platform/internal/logger"
-	"github.com/20TB-ZipBomb/GGJ_Platform/pkg/ws"
+	"github.com/20TB-ZipBomb/GGJ_Platform/pkg/network"
 )
 
 var ip = flag.String("ip", "localhost", "target ip address")
@@ -21,7 +21,7 @@ func Run() {
 	addr := *ip + ":" + strconv.Itoa(*port)
 	logger.Infof("Server running on %s", addr)
 
-	server := ws.WebSocketServer{
+	server := network.WebSocketServer{
 		Addr:           addr,
 		HTTPTimeout:    10 * time.Second,
 		MaxHeaderBytes: 1024,
