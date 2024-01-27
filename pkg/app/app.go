@@ -2,17 +2,24 @@ package app
 
 import (
 	"flag"
+	"strconv"
 	"time"
 
 	"github.com/20TB-ZipBomb/GGJ_Platform/internal/logger"
 	"github.com/20TB-ZipBomb/GGJ_Platform/pkg/ws"
 )
 
+var ip = flag.String("ip", "localhost", "target ip address")
+var port = flag.Int("port", 4041, "target port")
+
 func Run() {
+	flag.Parse()
+
 	logger.Init()
 	defer logger.Sync()
 
-	addr := flag.Lookup("addr").Value.String()
+	addr := *ip + ":" + strconv.Itoa(*port)
+	logger.Infof("Server running on %s", addr)
 
 	server := ws.WebSocketServer{
 		Addr:           addr,

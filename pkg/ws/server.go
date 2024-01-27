@@ -23,7 +23,7 @@ var upgrader = websocket.Upgrader{
 func Echo(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logger.Errorf("upgrade: %s", err)
+		logger.Errorf("Upgrade error: %v", err)
 		return
 	}
 	defer conn.Close()
@@ -45,8 +45,30 @@ func Echo(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func serveWebSocket(room *Lobby, w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		logger.Errorf("Upgrade error: %v", err)
+		return
+	}
+
+	player := &Player{
+		lobby: room,
+		conn:  conn,
+		send:  make(chan []byte, 256),
+	}
+	player.lobby.register <- player
+}
+
 func (server *WebSocketServer) Start() {
-	http.HandleFunc("/", Echo)
+	lobby := newLobby()
+	go lobby.run()
+
+	http.HandleFunc("/echo", Echo)
+	http.HandleFunc("/lobby", func(w http.ResponseWriter, r *http.Request) {
+		// todo: we need to wait for the game to send a follow-up message here
+		serveWebSocket(lobby, w, r)
+	})
 
 	httpServer := &http.Server{
 		Addr:           server.Addr,
