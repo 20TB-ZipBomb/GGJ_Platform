@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"github.com/20TB-ZipBomb/GGJ_Platform/internal/logger"
+	"github.com/20TB-ZipBomb/GGJ_Platform/internal/utils"
 	"github.com/20TB-ZipBomb/GGJ_Platform/pkg/network"
 )
 
 var ip = flag.String("ip", "localhost", "target ip address")
 var port = flag.Int("port", 4041, "target port")
+var env = flag.String("env", "dev", "server environment")
 
 func Run() {
 	flag.Parse()
@@ -19,7 +21,7 @@ func Run() {
 	defer logger.Sync()
 
 	addr := *ip + ":" + strconv.Itoa(*port)
-	logger.Infof("Server running on %s", addr)
+	logger.Infof("%s server running on %s", utils.SanitizeEnvFlag(*env), addr)
 
 	server := network.WebSocketServer{
 		Addr:           addr,

@@ -16,15 +16,37 @@ type WebSocketServer struct {
 	HTTPTimeout    time.Duration
 	MaxHeaderBytes int
 	listener       net.Listener
+	lobby          *Lobby
+	upgrader       websocket.Upgrader
 }
 
-// todo: Consolidate use of websocket.Upgrader
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(_ *http.Request) bool { return true },
+func (server *WebSocketServer) Start() {
+	server.lobby = nil
+	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
+		server.upgrader = websocket.Upgrader{
+			CheckOrigin: func(_ *http.Request) bool { return true },
+		}
+
+		logger.Infof("New websocket connection made on %s", r.URL)
+		serveWebSocket(server, w, r)
+	})
+
+	httpServer := &http.Server{
+		Addr:           server.Addr,
+		ReadTimeout:    server.HTTPTimeout,
+		WriteTimeout:   server.HTTPTimeout,
+		MaxHeaderBytes: server.MaxHeaderBytes,
+	}
+
+	err := httpServer.ListenAndServe()
+	if err != nil {
+		logger.Fatalf("Failed to listen and serve: %v", err)
+	}
 }
 
-func ServeWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+// The main service and entrypoint for serving new clients via websocket connections
+func serveWebSocket(s *WebSocketServer, w http.ResponseWriter, r *http.Request) {
+	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Errorf("Upgrade error: %v", err)
 		return
@@ -39,46 +61,39 @@ func ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logger.Debugf("Received: %s", msg)
-		msgJSON := json.UnmarshalJSON[Message](msg)
-		logger.Debugf("Unmarshal: %s", msgJSON.MessageType)
 
-		// todo: Add checks for attempting to join the lobby here, deny them if the specified lobby doesn't exist
-
-		if msgJSON.MessageType == CreateLobby {
-			lobby := newLobby()
-			go lobby.run()
-
-			client := &Client{
-				clientType: Game,
-				lobby:      lobby,
-				conn:       conn,
-				send:       make(chan []byte, 256),
+		switch msgJSON := json.UnmarshalJSON[Message](msg); msgJSON.MessageType {
+		case CreateLobby:
+			if s.lobby == nil {
+				s.lobby = newLobby()
+				go s.lobby.run()
 			}
 
+			client := CreateGameClient(s.lobby, conn)
 			client.lobby.register <- client
-		} else {
-			// If this message is anything else it's not the game client and we can refuse it
-			rejMsg := &Message{
-				MessageType: ConnectionRejected,
+		case LobbyJoinAttempt:
+			if s.lobby == nil {
+				logger.Debug("lobby is nil")
+				rejectConnection(conn)
+				continue
 			}
-			rejJSON := json.MarshalJSON[Message](rejMsg)
-			conn.WriteJSON(rejJSON)
+
+			lobbyJoinJSON := json.UnmarshalJSON[LobbyJoinAttemptMessage](msg)
+			logger.Debugf("%s requested lobby %s", lobbyJoinJSON.PlayerName, lobbyJoinJSON.LobbyCode)
+
+			// client := CreateWebClient(lobby, conn)
+			// client.lobby.register <- client
+		default:
+			rejectConnection(conn)
 		}
 	}
 }
 
-func (server *WebSocketServer) Start() {
-	http.HandleFunc("/connect", ServeWebSocket)
-
-	httpServer := &http.Server{
-		Addr:           server.Addr,
-		ReadTimeout:    server.HTTPTimeout,
-		WriteTimeout:   server.HTTPTimeout,
-		MaxHeaderBytes: server.MaxHeaderBytes,
+// Rejects an incoming connection, responding with a connection rejected message
+func rejectConnection(conn *websocket.Conn) {
+	connRejMsg := &Message{
+		MessageType: ConnectionRejected,
 	}
 
-	err := httpServer.ListenAndServe()
-	if err != nil {
-		logger.Fatalf("Failed to listen and serve: %v", err)
-	}
+	conn.WriteJSON(json.MarshalJSON[Message](connRejMsg))
 }

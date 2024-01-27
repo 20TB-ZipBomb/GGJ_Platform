@@ -16,6 +16,7 @@ func Init() {
 	encoderConfig := useEnvEncoderConfig()
 	encoderConfig.StacktraceKey = ""
 	encoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.DateTime)
+	encoderConfig.EncodeLevel = zapcore.LowercaseColorLevelEncoder
 	config.EncoderConfig = encoderConfig
 
 	logger, err := config.Build(zap.AddCallerSkip(1))
@@ -44,6 +45,14 @@ func Debug(args ...interface{}) {
 
 func Debugf(template string, args ...interface{}) {
 	sugar.Debugf(template, args...)
+}
+
+func Warn(args ...interface{}) {
+	sugar.Warn(args...)
+}
+
+func Warnf(template string, args ...interface{}) {
+	sugar.Warnf(template, args...)
 }
 
 func Error(args ...interface{}) {
