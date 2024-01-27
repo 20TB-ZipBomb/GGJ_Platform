@@ -1,60 +1,79 @@
 package logger
 
 import (
-    "go.uber.org/zap"
-    "go.uber.org/zap/zapcore"
+	"time"
 
-    "github.com/20TB-ZipBomb/GGJ_Platform/internal/utils"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
+	"github.com/20TB-ZipBomb/GGJ_Platform/internal/utils"
 )
 
 var sugar *zap.SugaredLogger
 
 func Init() {
-    config := UseEnvConfig()
-    encoderConfig := UseEnvEncoderConfig()
-    encoderConfig.StacktraceKey = ""
-    config.EncoderConfig = encoderConfig
+	config := UseEnvConfig()
+	encoderConfig := UseEnvEncoderConfig()
+	encoderConfig.StacktraceKey = ""
+	encoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.DateTime)
+	config.EncoderConfig = encoderConfig
 
-    logger, err := config.Build(zap.AddCallerSkip(1))
-    if err != nil {
-        panic(err)
-    }
+	logger, err := config.Build(zap.AddCallerSkip(1))
+	if err != nil {
+		panic(err)
+	}
 
-    sugar = logger.Sugar()
+	sugar = logger.Sugar()
 }
 
 func Sync() {
-    sugar.Sync()
+	sugar.Sync()
 }
 
 func UseEnvConfig() zap.Config {
-    if utils.IsProductionEnv() {
-        return zap.NewProductionConfig()
-    }
+	if utils.IsProductionEnv() {
+		return zap.NewProductionConfig()
+	}
 
-    return zap.NewDevelopmentConfig()
+	return zap.NewDevelopmentConfig()
 }
 
 func UseEnvEncoderConfig() zapcore.EncoderConfig {
-    if utils.IsProductionEnv() {
-        return zap.NewProductionEncoderConfig()
-    }
+	if utils.IsProductionEnv() {
+		return zap.NewProductionEncoderConfig()
+	}
 
-    return zap.NewDevelopmentEncoderConfig()
+	return zap.NewDevelopmentEncoderConfig()
 }
 
-func Info(msg string, fields ...interface{}) {
-    sugar.Info(msg, fields)
+func Info(args ...interface{}) {
+	sugar.Info(args...)
 }
 
-func Debug(msg string, fields ...interface{}) {
-    sugar.Debug(msg, fields)
+func Infof(template string, args ...interface{}) {
+	sugar.Infof(template, args...)
 }
 
-func Error(msg string, fields ...interface{}) {
-    sugar.Error(msg, fields)
+func Debug(args ...interface{}) {
+	sugar.Debug(args...)
 }
 
-func Fatal(msg string, fields ...interface{}) {
-    sugar.Fatal(msg, fields)
+func Debugf(template string, args ...interface{}) {
+	sugar.Debugf(template, args...)
+}
+
+func Error(args ...interface{}) {
+	sugar.Error(args...)
+}
+
+func Errorf(template string, args ...interface{}) {
+	sugar.Errorf(template, args...)
+}
+
+func Fatal(args ...interface{}) {
+	sugar.Fatal(args...)
+}
+
+func Fatalf(template string, args ...interface{}) {
+	sugar.Fatalf(template, args...)
 }
