@@ -1,33 +1,43 @@
 package network
 
-import (
-	"github.com/20TB-ZipBomb/GGJ_Platform/internal/logger"
-	"github.com/20TB-ZipBomb/GGJ_Platform/internal/utils/json"
-)
-
 type MessageType string
 
 const (
 	ConnectionRejected MessageType = "connection_rejected"
 	CreateLobby                    = "create_lobby"
+	LobbyCode                      = "lobby_code"
+	LobbyJoinAttempt               = "lobby_join_attempt"
+	PlayerJoined                   = "player_joined"
 )
 
 // Generic communication message containing a message type
 type Message struct {
-	Type MessageType `json:"message_type"`
+	MessageType MessageType `json:"message_type"`
 }
 
-// Creates a generic communication message containing a message type
-func CreateMessageJSON(msgType MessageType) string {
-	msg := &Message{
-		Type: msgType,
-	}
+// Message containing a lobby code to send to game clients
+// Server -> Game Client
+type LobbyCodeMessage struct {
+	Message
+	LobbyCode string `json:"lobby_code"`
+}
 
-	json, err := json.MarshalJSON[Message](msg)
-	if err != nil {
-		logger.Errorf("Failed to marshal JSON: %s\nerr: %v", msg, err)
-		return ""
-	}
+// Message containing information for web clients attempting to join a lobby
+// Web Client -> Server
+type LobbyJoinAttemptMessage struct {
+	LobbyCodeMessage
+	PlayerName string `json:"player_name"`
+}
 
-	return string(json)
+// todo: Move this somewhere else
+type Player struct {
+	PlayerID string `json:"player_id"`
+	Name     string `json:"name"`
+}
+
+// Message containing information sent back to a player once they connect to the server
+// Server -> Web Client
+type PlayerJoinedMessage struct {
+	Message
+	Player Player `json:"player"`
 }

@@ -18,36 +18,12 @@ type WebSocketServer struct {
 	listener       net.Listener
 }
 
+// todo: Consolidate use of websocket.Upgrader
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(_ *http.Request) bool { return true },
 }
 
-// Echo endpoint used for testing
-func Echo(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		logger.Errorf("Upgrade error: %v", err)
-		return
-	}
-	defer conn.Close()
-
-	for {
-		mt, message, err := conn.ReadMessage()
-		if err != nil {
-			logger.Errorf("ReadMessage error: %s", err)
-			break
-		}
-
-		logger.Debugf("Received: %s", message)
-		err = conn.WriteMessage(mt, message)
-		if err != nil {
-			logger.Errorf("WriteMessage error: %s", err)
-			break
-		}
-	}
-}
-
-func serveWebSocket(w http.ResponseWriter, r *http.Request) {
+func ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Errorf("Upgrade error: %v", err)
@@ -63,10 +39,12 @@ func serveWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logger.Debugf("Received: %s", msg)
-		recvMsg, _ := json.UnmarshalJSON[Message](msg)
-		logger.Debugf("Unmarshal: %s", recvMsg.Type)
+		msgJSON := json.UnmarshalJSON[Message](msg)
+		logger.Debugf("Unmarshal: %s", msgJSON.MessageType)
 
-		if recvMsg.Type == CreateLobby {
+		// todo: Add checks for attempting to join the lobby here, deny them if the specified lobby doesn't exist
+
+		if msgJSON.MessageType == CreateLobby {
 			lobby := newLobby()
 			go lobby.run()
 
@@ -80,15 +58,17 @@ func serveWebSocket(w http.ResponseWriter, r *http.Request) {
 			client.lobby.register <- client
 		} else {
 			// If this message is anything else it's not the game client and we can refuse it
-			connRejJSON := CreateMessageJSON(ConnectionRejected)
-			err = conn.WriteJSON(connRejJSON)
+			rejMsg := &Message{
+				MessageType: ConnectionRejected,
+			}
+			rejJSON := json.MarshalJSON[Message](rejMsg)
+			conn.WriteJSON(rejJSON)
 		}
 	}
 }
 
 func (server *WebSocketServer) Start() {
-	http.HandleFunc("/echo", Echo)
-	http.HandleFunc("/connect", serveWebSocket)
+	http.HandleFunc("/connect", ServeWebSocket)
 
 	httpServer := &http.Server{
 		Addr:           server.Addr,
