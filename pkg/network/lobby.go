@@ -37,6 +37,10 @@ func createLobby() *Lobby {
 
 // Closes the lobby, closing each connected client and the lobby's communication channels.
 func (l *Lobby) closeLobby() {
+	if l == nil {
+		return
+	}
+
 	logger.Verbose("[server] Closing lobby.")
 
 	l.hostGameClient.closeClient()
@@ -44,17 +48,12 @@ func (l *Lobby) closeLobby() {
 		c.closeClient()
 	}
 
-	l.webClients = make(map[*Client]bool)
-	l.socketsToClients = make(map[*websocket.Conn]*Client)
-
 	close(l.register)
 	close(l.unregister)
 	close(l.broadcast)
 	close(l.unicastGame)
 	close(l.unicastWeb)
 	close(l.disconnect)
-
-	l = nil
 }
 
 // Standard execution of the lobby, goroutine safe.
@@ -78,10 +77,8 @@ func (l *Lobby) run() {
 		case msg := <-l.unicastWeb:
 			l.unicastToWebClients(msg)
 		// Triggered when a client forcefully disconnects from the server
-		case conn := <-l.disconnect:
-			if ok := l.unregisterClientWithSocket(conn); ok {
-				return
-			}
+		case <-l.disconnect:
+			return
 		}
 	}
 }
@@ -135,7 +132,6 @@ func (l *Lobby) registerWebClient(c *Client) {
 // Unregister a client using their connected socket
 func (l *Lobby) unregisterClientWithSocket(c *websocket.Conn) bool {
 	if client, ok := l.socketsToClients[c]; ok {
-		logger.Verbose("unregistering")
 		l.unregisterClient(client)
 		return true
 	}

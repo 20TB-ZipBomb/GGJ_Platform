@@ -70,9 +70,17 @@ func serveWebSocket(s *WebSocketServer, w http.ResponseWriter, r *http.Request) 
 			}
 
 			// If the lobby has been created, treat this like a disconnect
-			if s.lobby != nil {
-				s.lobby.disconnect <- c
-				s.gameState.Reset()
+			if s.lobby != nil && c != nil {
+				if disconnectedClient := s.lobby.socketsToClients[c]; disconnectedClient.clientType == Game {
+					s.lobby.disconnect <- c
+					s.lobby.closeLobby()
+					s.lobby = nil
+					if s.gameState != nil {
+						s.gameState.Reset()
+					}
+				} else {
+					disconnectedClient.closeClient()
+				}
 			}
 			break
 		}

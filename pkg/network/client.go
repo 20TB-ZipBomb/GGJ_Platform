@@ -19,7 +19,6 @@ type Client struct {
 	Name       string
 	lobby      *Lobby
 	conn       *websocket.Conn
-	send       chan []byte
 }
 
 // Creates a game client associated with a particular lobby and connection
@@ -34,12 +33,12 @@ func createClient(l *Lobby, c *websocket.Conn, clientType ClientType) *Client {
 		UUID:       uuid,
 		lobby:      l,
 		conn:       c,
-		send:       make(chan []byte, 256),
 	}
 }
 
 // Closes a client and it's corresponding websocket connection.
 func (c *Client) closeClient() {
-	close(c.send)
-	c.conn.Close()
+	if c != nil {
+		c.conn.Close()
+	}
 }
