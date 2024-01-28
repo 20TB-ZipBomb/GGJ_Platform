@@ -90,10 +90,20 @@ type ReceivedCardsMessage struct {
 	JobCard    *Card   `json:"job_card"`
 }
 
-// Message sent from web clients indicating that a player has selected their card
+// Message sent from web clients indicating that a player has selected their card.
+// Web -> Server
 type CardDataMessage struct {
 	Message
 	Card *Card
+}
+
+// Message sent to the game client indicating that a player has started improv.
+// Server -> Game
+type PlayerImprovStartMessage struct {
+	PlayerIDMessage
+	SelectedCard  *Card
+	JobCard       *Card
+	TimeInSeconds int `json:"time_in_seconds"`
 }
 
 // Verifies the integrity of the `LobbyJoinAttemptMessage`, reports errors as required

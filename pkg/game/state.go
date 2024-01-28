@@ -16,9 +16,11 @@ type State struct {
 	PlayersToSubmittedJobs map[uuid.UUID][]*pack.Card
 	PlayersToDealtJobs     map[uuid.UUID][]*pack.Card
 	PlayersToPlayerState   map[uuid.UUID]*PlayerState
+	PlayerImprovOrder      []*PlayerState
 }
 
 type PlayerState struct {
+	UUID         uuid.UUID
 	DrawnCards   []*pack.Card
 	JobCard      *pack.Card
 	SelectedCard *pack.Card
@@ -37,6 +39,7 @@ func CreateGameState(uuids []uuid.UUID) *State {
 		PlayersToSubmittedJobs: make(map[uuid.UUID][]*pack.Card),
 		PlayersToDealtJobs:     make(map[uuid.UUID][]*pack.Card),
 		PlayersToPlayerState:   make(map[uuid.UUID]*PlayerState),
+		PlayerImprovOrder:      make([]*PlayerState, 0),
 	}
 
 	// Construct the array of jobs for each connected UUID
@@ -59,12 +62,14 @@ func CreateGameState(uuids []uuid.UUID) *State {
 // Creates a player state with UUID and stores it inside the game state.
 func (s *State) CreatePlayerStateWithUUID(uuid uuid.UUID, drawnCards []*pack.Card, jobCard *pack.Card) {
 	ps := &PlayerState{
+		UUID:         uuid,
 		DrawnCards:   drawnCards,
 		JobCard:      jobCard,
 		SelectedCard: nil,
 	}
 
 	s.PlayersToPlayerState[uuid] = ps
+	s.PlayerImprovOrder = append(s.PlayerImprovOrder, ps)
 }
 
 // Resets the current game state.
@@ -78,6 +83,7 @@ func (s *State) Reset() {
 	s.PlayersToSubmittedJobs = make(map[uuid.UUID][]*pack.Card)
 	s.PlayersToDealtJobs = make(map[uuid.UUID][]*pack.Card)
 	s.PlayersToPlayerState = make(map[uuid.UUID]*PlayerState)
+	s.PlayerImprovOrder = make([]*PlayerState, 0)
 }
 
 // Converts the current job pool array to a string.
@@ -131,6 +137,7 @@ func (s *State) HaveAllUsersFinishedSubmittingJobs() bool {
 func (s *State) HaveAllUsersSelectedAJobForImprov() bool {
 	for _, ps := range s.PlayersToPlayerState {
 		if ps.SelectedCard == nil {
+			logger.Debugf("the person who had %s has not selected", *ps.JobCard)
 			return false
 		}
 	}
@@ -140,7 +147,6 @@ func (s *State) HaveAllUsersSelectedAJobForImprov() bool {
 
 // Adds a job to the list of jobs for a user with the passed UUID.
 func (s *State) AddJob(targetUUID uuid.UUID, sj *string) {
-
 	// Early out if this user has already submitted their required jobs
 	if s.HasUserFinishedSubmittingJobs(targetUUID) {
 		return
@@ -192,4 +198,22 @@ func (s *State) DealJobsToPlayers() {
 	}
 
 	logger.Debugf("%s", s.JobUUIDMapToString(&s.PlayersToDealtJobs))
+}
+
+// Retrieves the next player for improv.
+func (s *State) GetNextPlayerForImprov() *PlayerState {
+	// Shuffle the ordering
+	rand.Shuffle(len(s.PlayerImprovOrder), func(i, j int) {
+		s.PlayerImprovOrder[i], s.PlayerImprovOrder[j] = s.PlayerImprovOrder[j], s.PlayerImprovOrder[i]
+	})
+
+	for _, ps := range s.PlayerImprovOrder {
+		logger.Verbosef("%s", ps.UUID.String())
+	}
+
+	// Pop the first item from slice
+	newPlayer := s.PlayerImprovOrder[:1]
+	s.PlayerImprovOrder = s.PlayerImprovOrder[1:]
+
+	return newPlayer[0]
 }

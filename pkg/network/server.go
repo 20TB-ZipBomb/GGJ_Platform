@@ -313,9 +313,32 @@ func (s *WebSocketServer) submitCardToGameState(c *websocket.Conn, cd pack.CardD
 
 	// Check if all players have selected a job for improv
 	if s.gameState.HaveAllUsersSelectedAJobForImprov() {
-		// Shuffle the player order
-		// Send the PlayerImprovStartMessage to the Game
-		// Send a generic PlayerID to the
+		ps := s.gameState.GetNextPlayerForImprov()
+
+		// Send an improv start message to the game
+		pism := pack.PlayerImprovStartMessage{
+			PlayerIDMessage: pack.PlayerIDMessage{
+				Message: pack.Message{
+					MessageType: pack.PlayerID,
+				},
+				PlayerID: ps.UUID,
+			},
+			SelectedCard:  ps.SelectedCard,
+			JobCard:       ps.JobCard,
+			TimeInSeconds: 30,
+		}
+
+		client.lobby.unicastGame <- []byte(json.MarshalJSON[pack.PlayerImprovStartMessage](&pism))
+
+		// Send a generic PlayerID to the web client
+		pidm := pack.PlayerIDMessage{
+			Message: pack.Message{
+				MessageType: pack.PlayerID,
+			},
+			PlayerID: ps.UUID,
+		}
+
+		client.lobby.unicastWeb <- []byte(json.MarshalJSON[pack.PlayerIDMessage](&pidm))
 	}
 }
 
