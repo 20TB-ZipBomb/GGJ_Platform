@@ -51,13 +51,19 @@ func serveWebSocket(s *WebSocketServer, w http.ResponseWriter, r *http.Request) 
 		logger.Errorf("Upgrade error: %v", err)
 		return
 	}
-	defer c.Close()
 
 	for {
 		_, msg, err := c.ReadMessage()
 		if err != nil {
+			// Filter generic close errors
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				logger.Errorf("Error reading message: %v", err)
+			}
+
+			// If the lobby has been created, treat this like a disconnect
+			if s.lobby != nil {
+				s.lobby.disconnect <- c
+				s.lobby = nil
 			}
 			break
 		}

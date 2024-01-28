@@ -14,6 +14,7 @@ type Lobby struct {
 	broadcast      chan []byte
 	unicastGame    chan []byte
 	unicastWeb     chan []byte
+	disconnect     chan *websocket.Conn
 }
 
 // Creates the lobby and it's communication channels.
@@ -27,6 +28,7 @@ func createLobby() *Lobby {
 		broadcast:      make(chan []byte),
 		unicastGame:    make(chan []byte),
 		unicastWeb:     make(chan []byte),
+		disconnect:     make(chan *websocket.Conn),
 	}
 }
 
@@ -43,6 +45,7 @@ func (l *Lobby) closeLobby() {
 	close(l.broadcast)
 	close(l.unicastGame)
 	close(l.unicastWeb)
+	close(l.disconnect)
 }
 
 // Standard execution of the lobby, goroutine safe.
@@ -55,11 +58,21 @@ func (l *Lobby) run() {
 		// Triggered when a client is unregistered from the server
 		case c := <-l.unregister:
 			l.unregisterClient(c)
-		// Triggered when a message is broadcasted to all server clients
+		// Triggered when a message is broadcasted to all clients
 		case msg := <-l.broadcast:
 			l.broadcastToClients(msg)
+		// Triggered when a message is unicasted to the game client
 		case msg := <-l.unicastGame:
 			l.unicastToGameClient(msg)
+		// Triggered when a message is unicasted to all web clients
+		// (really just a broadcast without the hosting client, but it works)
+		case msg := <-l.unicastWeb:
+			l.unicastToWebClients(msg)
+		// Triggered when a client forcefully disconnects from the server
+		case conn := <-l.disconnect:
+			if isHostSocket := l.unregisterClientWithSocket(conn); isHostSocket {
+				return
+			}
 		}
 	}
 }
@@ -107,17 +120,35 @@ func (l *Lobby) registerWebClient(c *Client) {
 	c.conn.WriteJSON(pidm)
 }
 
+// Unregister a client using their connected socket
+func (l *Lobby) unregisterClientWithSocket(c *websocket.Conn) bool {
+	if c == l.hostGameClient.conn {
+		l.unregisterClient(l.hostGameClient)
+		return true
+	}
+
+	for client := range l.webClients {
+		if c == client.conn {
+			l.unregisterClient(client)
+			break
+		}
+	}
+
+	return false
+}
+
 // Unregisters a client from the server and closes it's relevant connections.
 // If the host game client is unregistered, the entire lobby is closed.
 func (l *Lobby) unregisterClient(c *Client) {
 	if _, ok := l.webClients[c]; ok {
 		delete(l.webClients, c)
-		defer c.closeClient()
+		c.closeClient()
 	} else if c == l.hostGameClient {
-		defer l.closeLobby()
+		l.closeLobby()
 	}
 }
 
+// Broadcasts a message to the host game client and all connected clients.
 func (l *Lobby) broadcastToClients(msg []byte) {
 	for c := range l.webClients {
 		select {
@@ -126,6 +157,14 @@ func (l *Lobby) broadcastToClients(msg []byte) {
 	}
 }
 
+// Sends a message to the host game client.
 func (l *Lobby) unicastToGameClient(msg []byte) {
 	l.hostGameClient.conn.WriteMessage(websocket.BinaryMessage, msg)
+}
+
+// Sends a message to all connected web clients.
+func (l *Lobby) unicastToWebClients(msg []byte) {
+	for c := range l.webClients {
+		c.conn.WriteMessage(websocket.BinaryMessage, msg)
+	}
 }

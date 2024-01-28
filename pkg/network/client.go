@@ -41,4 +41,5 @@ func createClient(l *Lobby, c *websocket.Conn, clientType ClientType) *Client {
 // Closes a client and it's corresponding websocket connection.
 func (c *Client) closeClient() {
 	close(c.send)
+	c.conn.Close()
 }
