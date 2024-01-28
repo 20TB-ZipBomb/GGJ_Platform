@@ -19,7 +19,9 @@ const (
 	JobSubmitted                      = "job_submitted"
 	JobSubmittingFinished             = "player_job_submitting_finished"
 	ReceivedCards                     = "received_cards"
+	PlayerImprovStart                 = "player_improv_start"
 	CardData                          = "card_data"
+	InterceptionCardData              = "intercept_card_data"
 	TimerFinished                     = "timer_finished"
 	ScoreSubmission                   = "score_submission"
 	GameFinished                      = "game_finished"
@@ -114,6 +116,12 @@ type PlayerImprovStartMessage struct {
 type ScoreSubmissionMessage struct {
 	Message
 	ScoreInCents int `json:"score_in_cents"`
+}
+
+type InterceptionCardMessage struct {
+	PlayerIDMessage
+	InterceptedCard *Card `json:"intercepted_card"`
+	TimeInSeconds   int   `json:"time_in_seconds"`
 }
 
 // Verifies the integrity of the `LobbyJoinAttemptMessage`, reports errors as required

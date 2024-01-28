@@ -12,7 +12,7 @@ import (
 
 const (
 	// Default starting time fora  round of improv (int)
-	ImprovDefaultStartingTime = 5
+	ImprovDefaultStartingTime = 30
 
 	// Default starting time for a round of improv (seconds)
 	ImprovDefaultStartingTimeSeconds = ImprovDefaultStartingTime * time.Second
@@ -32,6 +32,7 @@ type State struct {
 	PlayersToDealtJobs     map[uuid.UUID][]*pack.Card
 	PlayersToPlayerState   map[uuid.UUID]*PlayerState
 	PlayerImprovOrder      []*PlayerState
+	ImprovTimer            *time.Timer
 }
 
 type PlayerState struct {
@@ -57,6 +58,7 @@ func CreateGameState(uuids []uuid.UUID) *State {
 		PlayersToDealtJobs:     make(map[uuid.UUID][]*pack.Card),
 		PlayersToPlayerState:   make(map[uuid.UUID]*PlayerState),
 		PlayerImprovOrder:      make([]*PlayerState, 0),
+		ImprovTimer:            nil,
 	}
 
 	// Construct the array of jobs for each connected UUID
@@ -103,6 +105,7 @@ func (s *State) Reset() {
 	s.PlayersToDealtJobs = make(map[uuid.UUID][]*pack.Card)
 	s.PlayersToPlayerState = make(map[uuid.UUID]*PlayerState)
 	s.PlayerImprovOrder = make([]*PlayerState, 0)
+	s.ImprovTimer = nil
 }
 
 // Converts the current job pool array to a string.
@@ -232,10 +235,6 @@ func (s *State) GetNextPlayerForImprov() *PlayerState {
 		s.PlayerImprovOrder[i], s.PlayerImprovOrder[j] = s.PlayerImprovOrder[j], s.PlayerImprovOrder[i]
 	})
 
-	for _, ps := range s.PlayerImprovOrder {
-		logger.Verbosef("%s", ps.UUID.String())
-	}
-
 	// The first item in the slice is currently presenting
 	return s.PlayerImprovOrder[0]
 }
@@ -244,10 +243,20 @@ type TimerCallback func()
 
 // Starts an improv timer on the server, sends appropriate responses once complete
 func (s *State) StartImprovTimer(cb TimerCallback) {
-	logger.Verbosef("Improv started, set timer at %s seconds.", ImprovDefaultStartingTimeSeconds.String())
+	if s.ImprovTimer != nil {
+		logger.Warn("Tried to start a new round of improv but the timer is already going, ignoring.")
+		return
+	}
 
-	timer := time.NewTimer(ImprovDefaultStartingTimeSeconds)
-	<-timer.C
+	s.ImprovTimer = time.NewTimer(ImprovDefaultStartingTimeSeconds)
+	<-s.ImprovTimer.C
 
 	cb()
+
+	s.ImprovTimer = nil
+}
+
+// Resets the improv timer to a time, used during interceptions.
+func (s *State) ResetImprovTimer() {
+	s.ImprovTimer.Reset(ImprovInterceptionAddingTimeSeconds)
 }
