@@ -3,10 +3,25 @@ package game
 import (
 	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/20TB-ZipBomb/GGJ_Platform/internal/logger"
 	"github.com/20TB-ZipBomb/GGJ_Platform/pkg/pack"
 	"github.com/google/uuid"
+)
+
+const (
+	// Default starting time fora  round of improv (int)
+	ImprovDefaultStartingTime = 5
+
+	// Default starting time for a round of improv (seconds)
+	ImprovDefaultStartingTimeSeconds = ImprovDefaultStartingTime * time.Second
+
+	// Default time to add to the current timer on interception (int)
+	ImprovInterceptionAddingTime = 30
+
+	// Default time to add to the current timer on interception
+	ImprovInterceptionAddingTimeSeconds = ImprovInterceptionAddingTime * time.Second
 )
 
 // Maintains the state of the game on the server.
@@ -20,10 +35,12 @@ type State struct {
 }
 
 type PlayerState struct {
-	UUID         uuid.UUID
-	DrawnCards   []*pack.Card
-	JobCard      *pack.Card
-	SelectedCard *pack.Card
+	UUID                    uuid.UUID
+	DrawnCards              []*pack.Card
+	JobCard                 *pack.Card
+	SelectedCard            *pack.Card
+	ScoreInCents            int
+	NumberOfScoresSubmitted int
 }
 
 // Initializes the game state with the current number of players extracted from a list of their UUIDs.
@@ -62,10 +79,12 @@ func CreateGameState(uuids []uuid.UUID) *State {
 // Creates a player state with UUID and stores it inside the game state.
 func (s *State) CreatePlayerStateWithUUID(uuid uuid.UUID, drawnCards []*pack.Card, jobCard *pack.Card) {
 	ps := &PlayerState{
-		UUID:         uuid,
-		DrawnCards:   drawnCards,
-		JobCard:      jobCard,
-		SelectedCard: nil,
+		UUID:                    uuid,
+		DrawnCards:              drawnCards,
+		JobCard:                 jobCard,
+		SelectedCard:            nil,
+		ScoreInCents:            0,
+		NumberOfScoresSubmitted: 0,
 	}
 
 	s.PlayersToPlayerState[uuid] = ps
@@ -145,6 +164,12 @@ func (s *State) HaveAllUsersSelectedAJobForImprov() bool {
 	return true
 }
 
+// Checks if all players have submitted a score for the last improv.
+func (s *State) HaveAllUsersSubmittedScoresForLastImprov() bool {
+	// todo: Scuffed, but works
+	return s.PlayerImprovOrder[0].NumberOfScoresSubmitted == (len(s.PlayersToSubmittedJobs) - 1)
+}
+
 // Adds a job to the list of jobs for a user with the passed UUID.
 func (s *State) AddJob(targetUUID uuid.UUID, sj *string) {
 	// Early out if this user has already submitted their required jobs
@@ -211,9 +236,18 @@ func (s *State) GetNextPlayerForImprov() *PlayerState {
 		logger.Verbosef("%s", ps.UUID.String())
 	}
 
-	// Pop the first item from slice
-	newPlayer := s.PlayerImprovOrder[:1]
-	s.PlayerImprovOrder = s.PlayerImprovOrder[1:]
+	// The first item in the slice is currently presenting
+	return s.PlayerImprovOrder[0]
+}
 
-	return newPlayer[0]
+type TimerCallback func()
+
+// Starts an improv timer on the server, sends appropriate responses once complete
+func (s *State) StartImprovTimer(cb TimerCallback) {
+	logger.Verbosef("Improv started, set timer at %s seconds.", ImprovDefaultStartingTimeSeconds.String())
+
+	timer := time.NewTimer(ImprovDefaultStartingTimeSeconds)
+	<-timer.C
+
+	cb()
 }

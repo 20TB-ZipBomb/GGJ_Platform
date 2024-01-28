@@ -20,6 +20,9 @@ const (
 	JobSubmittingFinished             = "player_job_submitting_finished"
 	ReceivedCards                     = "received_cards"
 	CardData                          = "card_data"
+	TimerFinished                     = "timer_finished"
+	ScoreSubmission                   = "score_submission"
+	GameFinished                      = "game_finished"
 )
 
 // Generic communication message containing a message type
@@ -106,6 +109,13 @@ type PlayerImprovStartMessage struct {
 	TimeInSeconds int `json:"time_in_seconds"`
 }
 
+// Message sent to and from clients to represent the submission of salary scores in cents
+// Web -> Server / Server -> Game
+type ScoreSubmissionMessage struct {
+	Message
+	ScoreInCents int `json:"score_in_cents"`
+}
+
 // Verifies the integrity of the `LobbyJoinAttemptMessage`, reports errors as required
 func (l *LobbyJoinAttemptMessage) Verify(lc *string) error {
 	if l.LobbyCode == nil {
@@ -132,6 +142,7 @@ func (j *JobSubmittedMessage) Verify() error {
 	return nil
 }
 
+// Verifies the integrity of the `CardDataMessage`, reports errors as required.
 func (c *CardDataMessage) Verify() error {
 	if c.Card == nil {
 		return errors.New("Card submission request was received, but no card was specfied.")
