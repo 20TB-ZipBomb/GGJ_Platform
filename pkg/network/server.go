@@ -409,7 +409,7 @@ func (s *WebSocketServer) handleScoreSubmission(c *websocket.Conn, ss pack.Score
 	lastPresenter.ScoreInCents += ss.ScoreInCents
 	lastPresenter.NumberOfScoresSubmitted += 1
 
-	// Send a player ID message to the server indicating that this player submitted a score
+	// Send a player ID message to the Game indicating that this player submitted a score
 	pidm := pack.PlayerIDMessage{
 		Message: pack.Message{
 			MessageType: pack.PlayerID,
@@ -429,6 +429,15 @@ func (s *WebSocketServer) handleScoreSubmission(c *websocket.Conn, ss pack.Score
 			s.gameState.PlayerImprovOrder = s.gameState.PlayerImprovOrder[1:]
 			// If the queue has at least one person left, perform another round of improv
 			if len(s.gameState.PlayerImprovOrder) >= 1 {
+				// Before starting the next improv send the cumulative score
+				ss := pack.ScoreSubmissionMessage{
+					Message: pack.Message{
+						MessageType: pack.ScoreSubmission,
+					},
+					ScoreInCents: lastPresenter.ScoreInCents,
+				}
+				client.lobby.unicastGame <- json.MarshalJSONBytes[pack.ScoreSubmissionMessage](&ss)
+
 				s.startNextImprov(c)
 			} else {
 				gfm := pack.Message{
