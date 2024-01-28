@@ -265,6 +265,9 @@ func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubm
 				drawnCards := uuidCards[0:(len(uuidCards) - 1)]
 				jobCard := uuidCards[len(uuidCards)-1]
 
+				// Set the player state inside the game state
+				s.gameState.CreatePlayerStateWithUUID(cl.UUID, drawnCards, jobCard)
+
 				rcmWeb := pack.ReceivedCardsMessage{
 					Message: pack.Message{
 						MessageType: pack.ReceivedCards,
@@ -293,7 +296,27 @@ func (s *WebSocketServer) submitCardToGameState(c *websocket.Conn, cd pack.CardD
 		return
 	}
 
-	// todo
+	// Send data back to the game client that this player has selected a role for improv
+	client, _ := s.lobby.socketsToClients[c]
+	if ps, ok := s.gameState.PlayersToPlayerState[client.UUID]; ok {
+		ps.SelectedCard = cd.Card
+
+		pid := pack.PlayerIDMessage{
+			Message: pack.Message{
+				MessageType: pack.CardData,
+			},
+			PlayerID: client.UUID,
+		}
+
+		client.lobby.unicastGame <- []byte(json.MarshalJSON[pack.PlayerIDMessage](&pid))
+	}
+
+	// Check if all players have selected a job for improv
+	if s.gameState.HaveAllUsersSelectedAJobForImprov() {
+		// Shuffle the player order
+		// Send the PlayerImprovStartMessage to the Game
+		// Send a generic PlayerID to the
+	}
 }
 
 // Rejects an incoming connection, responding with a connection rejected message.

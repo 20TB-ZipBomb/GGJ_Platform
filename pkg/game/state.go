@@ -15,11 +15,13 @@ type State struct {
 	JobInputsPerPlayer     int
 	PlayersToSubmittedJobs map[uuid.UUID][]*pack.Card
 	PlayersToDealtJobs     map[uuid.UUID][]*pack.Card
-	PlayersToPlayerState   map[uuid.UUID][]*PlayerState
+	PlayersToPlayerState   map[uuid.UUID]*PlayerState
 }
 
 type PlayerState struct {
-	// todo
+	DrawnCards   []*pack.Card
+	JobCard      *pack.Card
+	SelectedCard *pack.Card
 }
 
 // Initializes the game state with the current number of players extracted from a list of their UUIDs.
@@ -34,6 +36,7 @@ func CreateGameState(uuids []uuid.UUID) *State {
 		JobInputsPerPlayer:     numRequiredJobInputs,
 		PlayersToSubmittedJobs: make(map[uuid.UUID][]*pack.Card),
 		PlayersToDealtJobs:     make(map[uuid.UUID][]*pack.Card),
+		PlayersToPlayerState:   make(map[uuid.UUID]*PlayerState),
 	}
 
 	// Construct the array of jobs for each connected UUID
@@ -53,6 +56,17 @@ func CreateGameState(uuids []uuid.UUID) *State {
 	return s
 }
 
+// Creates a player state with UUID and stores it inside the game state.
+func (s *State) CreatePlayerStateWithUUID(uuid uuid.UUID, drawnCards []*pack.Card, jobCard *pack.Card) {
+	ps := &PlayerState{
+		DrawnCards:   drawnCards,
+		JobCard:      jobCard,
+		SelectedCard: nil,
+	}
+
+	s.PlayersToPlayerState[uuid] = ps
+}
+
 // Resets the current game state.
 func (s *State) Reset() {
 	if s == nil {
@@ -62,6 +76,8 @@ func (s *State) Reset() {
 	s.JobPool = make([]*pack.Card, 0)
 	s.JobInputsPerPlayer = 0
 	s.PlayersToSubmittedJobs = make(map[uuid.UUID][]*pack.Card)
+	s.PlayersToDealtJobs = make(map[uuid.UUID][]*pack.Card)
+	s.PlayersToPlayerState = make(map[uuid.UUID]*PlayerState)
 }
 
 // Converts the current job pool array to a string.
@@ -104,6 +120,17 @@ func (s *State) HasUserFinishedSubmittingJobs(uuid uuid.UUID) bool {
 func (s *State) HaveAllUsersFinishedSubmittingJobs() bool {
 	for uuid := range s.PlayersToSubmittedJobs {
 		if !s.HasUserFinishedSubmittingJobs(uuid) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Checks if all players have selected a job for improv.
+func (s *State) HaveAllUsersSelectedAJobForImprov() bool {
+	for _, ps := range s.PlayersToPlayerState {
+		if ps.SelectedCard == nil {
 			return false
 		}
 	}
