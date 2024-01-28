@@ -15,7 +15,13 @@ type Lobby struct {
 	broadcast        chan []byte
 	unicastGame      chan []byte
 	unicastWeb       chan []byte
+	dmSocket         chan *SocketDMRequest
 	disconnect       chan *websocket.Conn
+}
+
+type SocketDMRequest struct {
+	DestSocket *websocket.Conn
+	Data       []byte
 }
 
 // Creates the lobby and it's communication channels.
@@ -29,6 +35,7 @@ func createLobby() *Lobby {
 		broadcast:        make(chan []byte),
 		unicastGame:      make(chan []byte),
 		unicastWeb:       make(chan []byte),
+		dmSocket:         make(chan *SocketDMRequest),
 		disconnect:       make(chan *websocket.Conn),
 	}
 }
@@ -50,6 +57,7 @@ func (l *Lobby) closeLobby() {
 	close(l.broadcast)
 	close(l.unicastGame)
 	close(l.unicastWeb)
+	close(l.dmSocket)
 	close(l.disconnect)
 }
 
@@ -70,6 +78,9 @@ func (l *Lobby) run() {
 		// (really just a broadcast without the hosting client, but it works)
 		case msg := <-l.unicastWeb:
 			l.unicastToWebClients(msg)
+		// Triggered when a message needs to be sent to a particular client
+		case sdr := <-l.dmSocket:
+			l.dmTargetSocket(sdr)
 		// Triggered when a client forcefully disconnects from the server, used to end the goroutine
 		case <-l.disconnect:
 			return
@@ -141,4 +152,9 @@ func (l *Lobby) unicastToWebClients(msg []byte) {
 	for c := range l.webClients {
 		c.conn.WriteMessage(websocket.TextMessage, msg)
 	}
+}
+
+// Sends a message directly to a specific socket
+func (l *Lobby) dmTargetSocket(sdr *SocketDMRequest) {
+	sdr.DestSocket.WriteMessage(websocket.TextMessage, sdr.Data)
 }

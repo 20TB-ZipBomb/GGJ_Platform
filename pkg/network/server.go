@@ -11,6 +11,7 @@ import (
 	"github.com/20TB-ZipBomb/GGJ_Platform/internal/utils/json"
 	"github.com/20TB-ZipBomb/GGJ_Platform/pkg/game"
 	"github.com/20TB-ZipBomb/GGJ_Platform/pkg/pack"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -160,15 +161,21 @@ func (s *WebSocketServer) startGame(c *websocket.Conn) {
 		return
 	}
 
-	numPlayers := len(s.lobby.webClients)
+	clients := s.lobby.webClients
 	// todo: Remove production environment constraint for minimum number of players?
-	if utils.IsProductionEnv() && numPlayers < minimumNumberOfPlayers {
+	if utils.IsProductionEnv() && len(clients) < minimumNumberOfPlayers {
 		logger.Warn("Start game request was received, but the lobby has less than the minimum amount of clients connected that are required to play.")
 		rejectConnection(c)
 		return
 	}
 
-	s.gameState = game.CreateGameState(numPlayers)
+	// This has to be initialized with a list of UUIDs to properly setup the game (for now)
+	// Note: If we want to have drop-in/drop-out play later, we'd have to change this
+	uuids := make([]uuid.UUID, 0)
+	for client := range s.lobby.webClients {
+		uuids = append(uuids, client.UUID)
+	}
+	s.gameState = game.CreateGameState(uuids)
 
 	sgm := &pack.GameStartMessage{
 		Message: pack.Message{
@@ -200,6 +207,11 @@ func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubm
 		return
 	}
 
+	if s.gameState == nil {
+		logger.Warn("[server] Request to add a job was received, but the game hasn't started yet!")
+		return
+	}
+
 	s.gameState.AddJob(client.UUID, jsm.JobInput)
 
 	// Once the player has submitted the maximum number of jobs, send infomation to the game client
@@ -217,6 +229,40 @@ func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubm
 	// Once all players have finished submitting jobs
 	if s.gameState.HaveAllUsersFinishedSubmittingJobs() {
 		logger.Debug("All users have submitted jobs!")
+
+		// Send a message to the game indicating that players are now receiving their cards
+		{
+			rcmGame := pack.Message{
+				MessageType: pack.ReceivedCards,
+			}
+
+			client.lobby.unicastGame <- []byte(json.MarshalJSON[pack.Message](&rcmGame))
+		}
+
+		// Send a message to the web indicating that players are receiving shuffled job cards
+		{
+			s.gameState.DealJobsToPlayers()
+
+			for cl := range s.lobby.webClients {
+				uuidCards := s.gameState.PlayersToSubmittedJobs[cl.UUID]
+				drawnCards := uuidCards[0:(len(uuidCards) - 1)]
+				jobCard := uuidCards[len(uuidCards)-1]
+
+				rcmWeb := pack.ReceivedCardsMessage{
+					Message: pack.Message{
+						MessageType: pack.ReceivedCards,
+					},
+					DrawnCards: drawnCards,
+					JobCard:    jobCard,
+				}
+
+				rcmData := []byte(json.MarshalJSON[pack.ReceivedCardsMessage](&rcmWeb))
+				cl.lobby.dmSocket <- &SocketDMRequest{
+					DestSocket: cl.conn,
+					Data:       rcmData,
+				}
+			}
+		}
 	}
 }
 

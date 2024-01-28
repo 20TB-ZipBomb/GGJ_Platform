@@ -18,6 +18,7 @@ const (
 	GameStart                         = "game_start"
 	JobSubmitted                      = "job_submitted"
 	JobSubmittingFinished             = "player_job_submitting_finished"
+	ReceivedCards                     = "received_cards"
 )
 
 // Generic communication message containing a message type
@@ -84,8 +85,8 @@ type Card struct {
 // Server -> Web
 type ReceivedCardsMessage struct {
 	Message
-	DrawnCards []Card `json:"drawn_cards"`
-	JobCard    Card   `json:"job_card"`
+	DrawnCards []*Card `json:"drawn_cards"`
+	JobCard    *Card   `json:"job_card"`
 }
 
 // Verifies the integrity of the `LobbyJoinAttemptMessage`, reports errors as required
