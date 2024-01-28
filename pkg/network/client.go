@@ -15,7 +15,7 @@ const (
 
 type Client struct {
 	clientType ClientType
-	ID         uuid.UUID
+	UUID       uuid.UUID
 	Name       string
 	lobby      *Lobby
 	conn       *websocket.Conn
@@ -31,7 +31,7 @@ func createClient(l *Lobby, c *websocket.Conn, clientType ClientType) *Client {
 
 	return &Client{
 		clientType: clientType,
-		ID:         uuid,
+		UUID:       uuid,
 		lobby:      l,
 		conn:       c,
 		send:       make(chan []byte, 256),

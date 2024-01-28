@@ -1,9 +1,8 @@
-package network
+package pack
 
 import (
 	"errors"
 
-	"github.com/20TB-ZipBomb/GGJ_Platform/internal/logger"
 	"github.com/google/uuid"
 )
 
@@ -16,6 +15,8 @@ const (
 	LobbyJoinAttempt               = "lobby_join_attempt"
 	PlayerID                       = "player_id"
 	PlayerJoined                   = "player_joined"
+	GameStart                      = "game_start"
+	JobSubmitted                   = "job_submitted"
 )
 
 // Generic communication message containing a message type
@@ -47,7 +48,7 @@ type PlayerIDMessage struct {
 // todo: Move this somewhere else
 type Player struct {
 	PlayerID uuid.UUID `json:"player_id"`
-	Name     string    `json:"name"`
+	Name     *string   `json:"name"`
 }
 
 // Message containing information sent back to a player once they connect to the server.
@@ -57,7 +58,12 @@ type PlayerJoinedMessage struct {
 	Player Player `json:"player"`
 }
 
-// Verifies the integrity of the LobbyJoinAttemptMessage, reports errors as required
+type JobSubmittedMessage struct {
+	Message
+	JobInput *string `json:"job_input"`
+}
+
+// Verifies the integrity of the `LobbyJoinAttemptMessage`, reports errors as required
 func (l *LobbyJoinAttemptMessage) Verify(lc *string) error {
 	if l.LobbyCode == nil {
 		return errors.New("Lobby join request was received, but no lobby code was specified.")
@@ -67,9 +73,17 @@ func (l *LobbyJoinAttemptMessage) Verify(lc *string) error {
 		return errors.New("Lobby join request was received, but no player name was specified.")
 	}
 
-	logger.Debugf("%s requested lobby %s", *l.PlayerName, *l.LobbyCode)
 	if *l.LobbyCode != *lc {
 		return errors.New("Lobby join request was received, but the lobby code was incorrect.")
+	}
+
+	return nil
+}
+
+// Verifies the integrity of the `JobSubmittedMessage`, reports errors as required
+func (j *JobSubmittedMessage) Verify() error {
+	if j.JobInput == nil {
+		return errors.New("Job submission request was received, but no job was specified.")
 	}
 
 	return nil

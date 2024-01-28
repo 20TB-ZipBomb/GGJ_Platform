@@ -51,6 +51,18 @@ func Debugf(template string, args ...interface{}) {
 	}
 }
 
+func Verbose(args ...interface{}) {
+	if utils.IsVerboseLoggingEnabled() {
+		sugar.Debug(args...)
+	}
+}
+
+func Verbosef(template string, args ...interface{}) {
+	if utils.IsVerboseLoggingEnabled() {
+		sugar.Debugf(template, args...)
+	}
+}
+
 func Warn(args ...interface{}) {
 	sugar.Warn(args...)
 }

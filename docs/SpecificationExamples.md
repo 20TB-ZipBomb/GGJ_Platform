@@ -54,3 +54,29 @@ Additionally, any malformed or otherwise improper requests result in a *Connecti
     }
 }
 ```
+
+### Game Start (Game -> Server)
+#### Request
+```json
+{
+    "message_type": "game_start"
+}
+```
+
+#### Response (Web/Server Echoed Back)
+```json
+{
+    "message_type": "game_start"
+}
+```
+
+### Job Submitted (Web -> Server)
+#### Request (Consumed by the server, no response)
+```json
+{
+    "message_type": "job_submitted",
+    "job_input": "<JOB_INPUT>"
+}
+```
+
+###

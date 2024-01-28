@@ -13,6 +13,7 @@ import (
 var ip = flag.String("ip", "localhost", "target ip address")
 var port = flag.Int("port", 4041, "target port")
 var env = flag.String("env", "dev", "server environment")
+var verbose = flag.Bool("verbose", false, "enables verbose logging")
 
 func Run() {
 	flag.Parse()
