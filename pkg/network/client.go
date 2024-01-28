@@ -1,6 +1,10 @@
 package network
 
-import "github.com/gorilla/websocket"
+import (
+	"github.com/20TB-ZipBomb/GGJ_Platform/internal/logger"
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
+)
 
 type ClientType int
 
@@ -11,27 +15,30 @@ const (
 
 type Client struct {
 	clientType ClientType
+	ID         uuid.UUID
+	Name       string
 	lobby      *Lobby
 	conn       *websocket.Conn
 	send       chan []byte
 }
 
 // Creates a game client associated with a particular lobby and connection
-func CreateGameClient(l *Lobby, c *websocket.Conn) *Client {
+func createClient(l *Lobby, c *websocket.Conn, clientType ClientType) *Client {
+	uuid, err := uuid.NewRandom()
+	if err != nil {
+		logger.Errorf("Failed to generate new UUID: %v", err)
+	}
+
 	return &Client{
-		clientType: Game,
+		clientType: clientType,
+		ID:         uuid,
 		lobby:      l,
 		conn:       c,
 		send:       make(chan []byte, 256),
 	}
 }
 
-// Creates a web client associated with a particular lobby and connection
-func CreateWebClient(l *Lobby, c *websocket.Conn) *Client {
-	return &Client{
-		clientType: Web,
-		lobby:      l,
-		conn:       c,
-		send:       make(chan []byte, 256),
-	}
+// Closes a client and it's corresponding websocket connection.
+func (c *Client) closeClient() {
+	close(c.send)
 }

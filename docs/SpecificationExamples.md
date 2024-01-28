@@ -10,21 +10,47 @@ Additionally, any malformed or otherwise improper requests result in a *Connecti
     "message_type": "connection_refused"
 }
 ```
-
-#### Create lobby (Game -> Server)
+### Create lobby (Game -> Server)
+#### Request
 ```json
 {
     "message_type": "create_lobby"
 }
 ```
 
-#### Lobby Join Attempt (Web -> Server)
+#### Response (Game)
 ```json
-{
-    "message_type": "lobby_join_attempt",
-    "lobby_code": <LOBBY_CODE>,
-    "player_name": <PLAYER_NAME>
+{ 
+    "message_type": "lobby_code", 
+    "lobby_code": "1234" 
 }
 ```
 
+### Lobby Join Attempt (Web -> Server)
+#### Request
+```json
+{
+    "message_type": "lobby_join_attempt",
+    "lobby_code": "<LOBBY_CODE>",
+    "player_name": "<PLAYER_NAME>"
+}
+```
 
+#### Response (Web)
+```json
+{
+    "message_type": "player_id",
+    "player_id": "<PLAYER_UUID>"
+}
+```
+
+#### Response (Game)
+```json
+{
+    "message_type": "player_joined",
+    "player": {
+        "player_id": "<PLAYER_UUID>",
+        "name": "<PLAYER_NAME>"
+    }
+}
+```

@@ -1,0 +1,5 @@
+{
+    { "message_type": "lobby_code", "lobby_code": "1234" },
+    { "message_type": "player_id", "player_id": "d3def01d-2591-43be-abb3-c468d1ff0801" }
+    { "message_type": "player_joined", "player": { "player_id": "d3def01d-2591-43be-abb3-c468d1ff0801", "name": "Jake"}}
+}

@@ -1,0 +1,4 @@
+{
+    { "message_type": "create_lobby" },
+    { "message_type": "lobby_join_attempt", "lobby_code": "1234", "player_name": "Jake" }
+}

@@ -40,11 +40,15 @@ func Infof(template string, args ...interface{}) {
 }
 
 func Debug(args ...interface{}) {
-	sugar.Debug(args...)
+	if !utils.IsProductionEnv() {
+		sugar.Debug(args...)
+	}
 }
 
 func Debugf(template string, args ...interface{}) {
-	sugar.Debugf(template, args...)
+	if !utils.IsProductionEnv() {
+		sugar.Debugf(template, args...)
+	}
 }
 
 func Warn(args ...interface{}) {
