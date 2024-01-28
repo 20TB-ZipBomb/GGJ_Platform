@@ -58,6 +58,8 @@ type PlayerJoinedMessage struct {
 	Player Player `json:"player"`
 }
 
+// Message containing the information sent by web clients for submitted jobs.
+// Web -> Server
 type JobSubmittedMessage struct {
 	Message
 	JobInput *string `json:"job_input"`

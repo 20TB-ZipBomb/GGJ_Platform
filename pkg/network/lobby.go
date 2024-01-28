@@ -12,7 +12,6 @@ type Lobby struct {
 	socketsToClients map[*websocket.Conn]*Client
 	lobbyCode        string
 	register         chan *Client
-	unregister       chan *Client
 	broadcast        chan []byte
 	unicastGame      chan []byte
 	unicastWeb       chan []byte
@@ -27,7 +26,6 @@ func createLobby() *Lobby {
 		socketsToClients: make(map[*websocket.Conn]*Client),
 		lobbyCode:        "1234", // todo
 		register:         make(chan *Client),
-		unregister:       make(chan *Client),
 		broadcast:        make(chan []byte),
 		unicastGame:      make(chan []byte),
 		unicastWeb:       make(chan []byte),
@@ -49,7 +47,6 @@ func (l *Lobby) closeLobby() {
 	}
 
 	close(l.register)
-	close(l.unregister)
 	close(l.broadcast)
 	close(l.unicastGame)
 	close(l.unicastWeb)
@@ -63,9 +60,6 @@ func (l *Lobby) run() {
 		// Triggered when a client is registered on the server
 		case c := <-l.register:
 			l.registerClient(c)
-		// Triggered when a client is unregistered from the server
-		case c := <-l.unregister:
-			l.unregisterClient(c)
 		// Triggered when a message is broadcasted to all clients
 		case msg := <-l.broadcast:
 			l.broadcastToClients(msg)
@@ -76,7 +70,7 @@ func (l *Lobby) run() {
 		// (really just a broadcast without the hosting client, but it works)
 		case msg := <-l.unicastWeb:
 			l.unicastToWebClients(msg)
-		// Triggered when a client forcefully disconnects from the server
+		// Triggered when a client forcefully disconnects from the server, used to end the goroutine
 		case <-l.disconnect:
 			return
 		}
@@ -127,29 +121,6 @@ func (l *Lobby) registerWebClient(c *Client) {
 
 	// Respond with the player ID to the web client.
 	c.conn.WriteJSON(pidm)
-}
-
-// Unregister a client using their connected socket
-func (l *Lobby) unregisterClientWithSocket(c *websocket.Conn) bool {
-	if client, ok := l.socketsToClients[c]; ok {
-		l.unregisterClient(client)
-		return true
-	}
-
-	return false
-}
-
-// Unregisters a client from the server and closes it's relevant connections.
-// If the host game client is unregistered, the entire lobby is closed.
-func (l *Lobby) unregisterClient(c *Client) {
-	if _, ok := l.webClients[c]; ok {
-		logger.Verbosef("[server] Closing web client.")
-		delete(l.webClients, c)
-		c.closeClient()
-	} else if c == l.hostGameClient {
-		logger.Verbosef("[server] Closing game client.")
-		l.closeLobby()
-	}
 }
 
 // Broadcasts a message to the host game client and all connected clients.
