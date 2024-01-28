@@ -19,6 +19,7 @@ const (
 	JobSubmitted                      = "job_submitted"
 	JobSubmittingFinished             = "player_job_submitting_finished"
 	ReceivedCards                     = "received_cards"
+	CardData                          = "card_data"
 )
 
 // Generic communication message containing a message type
@@ -37,7 +38,7 @@ type LobbyCodeMessage struct {
 // Web -> Server
 type LobbyJoinAttemptMessage struct {
 	LobbyCodeMessage
-	PlayerName *string `json:"player_name"`
+	Name *string `json:"name"`
 }
 
 // Message containing the connected player's ID.
@@ -89,13 +90,19 @@ type ReceivedCardsMessage struct {
 	JobCard    *Card   `json:"job_card"`
 }
 
+// Message sent from web clients indicating that a player has selected their card
+type CardDataMessage struct {
+	Message
+	Card *Card
+}
+
 // Verifies the integrity of the `LobbyJoinAttemptMessage`, reports errors as required
 func (l *LobbyJoinAttemptMessage) Verify(lc *string) error {
 	if l.LobbyCode == nil {
 		return errors.New("Lobby join request was received, but no lobby code was specified.")
 	}
 
-	if l.PlayerName == nil {
+	if l.Name == nil {
 		return errors.New("Lobby join request was received, but no player name was specified.")
 	}
 
@@ -110,6 +117,22 @@ func (l *LobbyJoinAttemptMessage) Verify(lc *string) error {
 func (j *JobSubmittedMessage) Verify() error {
 	if j.JobInput == nil {
 		return errors.New("Job submission request was received, but no job was specified.")
+	}
+
+	return nil
+}
+
+func (c *CardDataMessage) Verify() error {
+	if c.Card == nil {
+		return errors.New("Card submission request was received, but no card was specfied.")
+	}
+
+	if err := uuid.Validate(c.Card.CardID.String()); err != nil {
+		return errors.New("Card submission request was receieved, but the card had a malformed UUID.")
+	}
+
+	if c.Card.JobText == nil {
+		return errors.New("Card submission request was received, but the card had malformed text.")
 	}
 
 	return nil

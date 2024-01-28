@@ -15,6 +15,11 @@ type State struct {
 	JobInputsPerPlayer     int
 	PlayersToSubmittedJobs map[uuid.UUID][]*pack.Card
 	PlayersToDealtJobs     map[uuid.UUID][]*pack.Card
+	PlayersToPlayerState   map[uuid.UUID][]*PlayerState
+}
+
+type PlayerState struct {
+	// todo
 }
 
 // Initializes the game state with the current number of players extracted from a list of their UUIDs.

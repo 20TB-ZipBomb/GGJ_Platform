@@ -87,7 +87,11 @@ func serveWebSocket(s *WebSocketServer, w http.ResponseWriter, r *http.Request) 
 		}
 
 		strMsg := string(msg)
-		logger.Verbosef("[payload] %s", strMsg[:len(strMsg)-1])
+		if end := strMsg[len(strMsg):]; end == "\n" {
+			logger.Verbosef("[payload] %s", strMsg[:len(strMsg)-1])
+		} else {
+			logger.Verbosef("[payload] %s", strMsg)
+		}
 
 		switch msgJSON := json.UnmarshalJSON[pack.Message](msg); msgJSON.MessageType {
 		case pack.CreateLobby:
@@ -100,6 +104,9 @@ func serveWebSocket(s *WebSocketServer, w http.ResponseWriter, r *http.Request) 
 		case pack.JobSubmitted:
 			jsm := json.UnmarshalJSON[pack.JobSubmittedMessage](msg)
 			s.addJobToGameState(c, &jsm)
+		case pack.CardData:
+			cd := json.UnmarshalJSON[pack.CardDataMessage](msg)
+			s.submitCardToGameState(c, cd)
 		default:
 			rejectConnection(c)
 		}
@@ -137,7 +144,7 @@ func (s *WebSocketServer) tryAddClientToLobby(c *websocket.Conn, ljam *pack.Lobb
 	}
 
 	client := createClient(s.lobby, c, Web)
-	client.Name = *ljam.PlayerName
+	client.Name = *ljam.Name
 	client.lobby.register <- client
 
 	// Send a message to the game client indicating that a web client has connected.
@@ -186,13 +193,33 @@ func (s *WebSocketServer) startGame(c *websocket.Conn) {
 	s.lobby.broadcast <- []byte(json.MarshalJSON[pack.GameStartMessage](sgm))
 }
 
+// Some basic pre-requisites to check before executing game state commands
+func (s *WebSocketServer) doesPassPreRequisites(c *websocket.Conn) bool {
+	if s.lobby == nil {
+		logger.Warn("[server] Request to add a job was recevied, but no lobby has been created yet.")
+		rejectConnection(c)
+		return false
+	}
+
+	_, ok := s.lobby.socketsToClients[c]
+	if !ok {
+		logger.Warnf("[server] Request to add a job was received, but the connecting socket hasn't registered as a player yet!")
+		return false
+	}
+
+	if s.gameState == nil {
+		logger.Warn("[server] Request to add a job was received, but the game hasn't started yet!")
+		return false
+	}
+
+	return true
+}
+
 // Adds a job requested by the game state.
 // This also deals out cards to players once they've all submitted as a side effect.
 // todo: Refactor this?
 func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubmittedMessage) {
-	if s.lobby == nil {
-		logger.Warn("[server] Request to add a job was recevied, but no lobby has been created yet.")
-		rejectConnection(c)
+	if !s.doesPassPreRequisites(c) {
 		return
 	}
 
@@ -201,17 +228,7 @@ func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubm
 		return
 	}
 
-	client, ok := s.lobby.socketsToClients[c]
-	if !ok {
-		logger.Warnf("[server] Request to add a job was received, but the connecting socket hasn't registered as a player yet!")
-		return
-	}
-
-	if s.gameState == nil {
-		logger.Warn("[server] Request to add a job was received, but the game hasn't started yet!")
-		return
-	}
-
+	client, _ := s.lobby.socketsToClients[c]
 	s.gameState.AddJob(client.UUID, jsm.JobInput)
 
 	// Once the player has submitted the maximum number of jobs, send infomation to the game client
@@ -231,16 +248,16 @@ func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubm
 		logger.Debug("All users have submitted jobs!")
 
 		// Send a message to the game indicating that players are now receiving their cards
-		{
+		go func() {
 			rcmGame := pack.Message{
 				MessageType: pack.ReceivedCards,
 			}
 
 			client.lobby.unicastGame <- []byte(json.MarshalJSON[pack.Message](&rcmGame))
-		}
+		}()
 
 		// Send a message to the web indicating that players are receiving shuffled job cards
-		{
+		go func() {
 			s.gameState.DealJobsToPlayers()
 
 			for cl := range s.lobby.webClients {
@@ -262,8 +279,21 @@ func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubm
 					Data:       rcmData,
 				}
 			}
-		}
+		}()
 	}
+}
+
+func (s *WebSocketServer) submitCardToGameState(c *websocket.Conn, cd pack.CardDataMessage) {
+	if !s.doesPassPreRequisites(c) {
+		return
+	}
+
+	if err := cd.Verify(); err != nil {
+		logger.Warnf("[server] Card submission failure: %v", err)
+		return
+	}
+
+	// todo
 }
 
 // Rejects an incoming connection, responding with a connection rejected message.

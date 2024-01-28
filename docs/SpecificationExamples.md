@@ -32,7 +32,7 @@ Additionally, any malformed or otherwise improper requests result in a *Connecti
 {
     "message_type": "lobby_join_attempt",
     "lobby_code": "<LOBBY_CODE>",
-    "player_name": "<PLAYER_NAME>"
+    "name": "<PLAYER_NAME>"
 }
 ```
 
@@ -94,10 +94,16 @@ Additionally, any malformed or otherwise improper requests result in a *Connecti
 ```json
 {
     "message_type": "received_cards",
-    "drawn_cards": {
-        "card_id": "<CARD_ID>",
-        "job_text": "<JOB_CARD_TEXT>"
-    },
+    "drawn_cards": [
+        {
+            "card_id": "<CARD_UUID>",
+            "job_text": "<JOB_CARD_TEXT>"
+        },
+        {
+            "card_id": "<CARD_UUID>",
+            "job_text": "<JOB_CARD_TEXT>"
+        }
+    ],
     "job_card": "<USER_JOB_CARD>"
 }
 ```
@@ -106,5 +112,25 @@ Additionally, any malformed or otherwise improper requests result in a *Connecti
 ```json
 {
     "message_type": "received_cards"
+}
+```
+
+### Card Data 
+#### Request (Web -> Server)
+```json
+{
+    "message_type": "card_data",
+    "card": {
+        "card_id": "<CARD_UUID>",
+        "job_text": "<JOB_CARD_TEXT>",
+    }
+}
+```
+
+#### Response (Server -> Game)
+```json
+{
+    "message_type": "card_data",
+    "player_id": "<PLAYER_UUID>"
 }
 ```

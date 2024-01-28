@@ -1,9 +1,0 @@
-{
-    { "message_type": "lobby_code", "lobby_code": "1234" },
-    { "message_type": "player_id", "player_id": "d3def01d-2591-43be-abb3-c468d1ff0801" }
-    { "message_type": "player_joined", "player": { "player_id": "d3def01d-2591-43be-abb3-c468d1ff0801", "name": "Jake"}}
-    { "message_type": "game_start", "number_of_jobs": "3" },
-    { "message_type": "player_job_submitting_finished", "player_id": "1c76c3cc-80b0-4038-9e43-85f6943831df" }
-    { "message_type": "received cards" }
-    { "message_type": "received cards", "drawn_cards": { "card_id": "999", "job_text": "Job Title" }, "job_card": "Target Job Title" }
-}
