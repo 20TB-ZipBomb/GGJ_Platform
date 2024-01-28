@@ -38,10 +38,33 @@ func (s *State) Reset() {
 	s.PlayersToSubmittedJobs = make(map[uuid.UUID][]*string)
 }
 
+// Checks if the user with the provided UUID has finished submitting jobs.
+func (s *State) HasUserFinishedSubmittingJobs(uuid uuid.UUID) bool {
+	numJobsSubmitted := len(s.PlayersToSubmittedJobs[uuid])
+	return numJobsSubmitted == s.JobInputsPerPlayer
+}
+
+// Checks if all players have finished submitting jobs.
+func (s *State) HaveAllUsersFinishedSubmittingJobs() bool {
+	for uuid := range s.PlayersToSubmittedJobs {
+		if !s.HasUserFinishedSubmittingJobs(uuid) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Adds a job to the list of jobs for a user with the passed UUID.
 func (s *State) AddJob(uuid uuid.UUID, sj *string) {
+	// Construct the array of jobs if this user hasn't created any yet
 	if _, ok := s.PlayersToSubmittedJobs[uuid]; !ok {
 		s.PlayersToSubmittedJobs[uuid] = make([]*string, 0)
+	}
+
+	// Early out if this user has already submitted their required jobs
+	if s.HasUserFinishedSubmittingJobs(uuid) {
+		return
 	}
 
 	// Append job to the pool of available jobs, as well as the jobs for this user
@@ -50,10 +73,16 @@ func (s *State) AddJob(uuid uuid.UUID, sj *string) {
 
 	// Display a helper string for jobs being added outside of production
 	if !utils.IsProductionEnv() {
-		jobs := make([]string, len(s.PlayersToSubmittedJobs[uuid]))
+		numJobsSubmitted := len(s.PlayersToSubmittedJobs[uuid])
+		jobs := make([]string, numJobsSubmitted)
 		for i, job := range s.PlayersToSubmittedJobs[uuid] {
 			jobs[i] = *job
 		}
 		logger.Debugf("[server] %s has submitted { %s }", uuid, strings.Join(jobs, ", "))
 	}
+}
+
+// Deals jobs to players
+func (s *State) DealJobsToPlayers() {
+	panic("unimplemented")
 }

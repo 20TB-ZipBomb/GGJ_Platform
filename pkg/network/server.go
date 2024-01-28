@@ -170,13 +170,18 @@ func (s *WebSocketServer) startGame(c *websocket.Conn) {
 
 	s.gameState = game.CreateGameState(numPlayers)
 
-	sgm := &pack.Message{
-		MessageType: pack.GameStart,
+	sgm := &pack.GameStartMessage{
+		Message: pack.Message{
+			MessageType: pack.GameStart,
+		},
+		NumberOfJobs: s.gameState.JobInputsPerPlayer,
 	}
-	s.lobby.broadcast <- []byte(json.MarshalJSON[pack.Message](sgm))
+	s.lobby.broadcast <- []byte(json.MarshalJSON[pack.GameStartMessage](sgm))
 }
 
 // Adds a job requested by the game state.
+// This also deals out cards to players once they've all submitted as a side effect.
+// todo: Refactor this?
 func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubmittedMessage) {
 	if s.lobby == nil {
 		logger.Warn("[server] Request to add a job was recevied, but no lobby has been created yet.")
@@ -196,6 +201,23 @@ func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubm
 	}
 
 	s.gameState.AddJob(client.UUID, jsm.JobInput)
+
+	// Once the player has submitted the maximum number of jobs, send infomation to the game client
+	if s.gameState.HasUserFinishedSubmittingJobs(client.UUID) {
+		pid := &pack.PlayerIDMessage{
+			Message: pack.Message{
+				MessageType: pack.JobSubmittingFinished,
+			},
+			PlayerID: client.UUID,
+		}
+
+		client.lobby.unicastGame <- []byte(json.MarshalJSON[pack.PlayerIDMessage](pid))
+	}
+
+	// Once all players have finished submitting jobs
+	if s.gameState.HaveAllUsersFinishedSubmittingJobs() {
+		logger.Debug("All users have submitted jobs!")
+	}
 }
 
 // Rejects an incoming connection, responding with a connection rejected message.

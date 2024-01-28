@@ -125,20 +125,20 @@ func (l *Lobby) registerWebClient(c *Client) {
 
 // Broadcasts a message to the host game client and all connected clients.
 func (l *Lobby) broadcastToClients(msg []byte) {
-	l.hostGameClient.conn.WriteMessage(websocket.BinaryMessage, msg)
+	l.hostGameClient.conn.WriteMessage(websocket.TextMessage, msg)
 	for c := range l.webClients {
-		c.conn.WriteMessage(websocket.BinaryMessage, msg)
+		c.conn.WriteMessage(websocket.TextMessage, msg)
 	}
 }
 
 // Sends a message to the host game client.
 func (l *Lobby) unicastToGameClient(msg []byte) {
-	l.hostGameClient.conn.WriteMessage(websocket.BinaryMessage, msg)
+	l.hostGameClient.conn.WriteMessage(websocket.TextMessage, msg)
 }
 
 // Sends a message to all connected web clients.
 func (l *Lobby) unicastToWebClients(msg []byte) {
 	for c := range l.webClients {
-		c.conn.WriteMessage(websocket.BinaryMessage, msg)
+		c.conn.WriteMessage(websocket.TextMessage, msg)
 	}
 }

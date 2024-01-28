@@ -9,14 +9,15 @@ import (
 type MessageType string
 
 const (
-	ConnectionRejected MessageType = "connection_rejected"
-	CreateLobby                    = "create_lobby"
-	LobbyCode                      = "lobby_code"
-	LobbyJoinAttempt               = "lobby_join_attempt"
-	PlayerID                       = "player_id"
-	PlayerJoined                   = "player_joined"
-	GameStart                      = "game_start"
-	JobSubmitted                   = "job_submitted"
+	ConnectionRejected    MessageType = "connection_rejected"
+	CreateLobby                       = "create_lobby"
+	LobbyCode                         = "lobby_code"
+	LobbyJoinAttempt                  = "lobby_join_attempt"
+	PlayerID                          = "player_id"
+	PlayerJoined                      = "player_joined"
+	GameStart                         = "game_start"
+	JobSubmitted                      = "job_submitted"
+	JobSubmittingFinished             = "player_job_submitting_finished"
 )
 
 // Generic communication message containing a message type
@@ -45,7 +46,7 @@ type PlayerIDMessage struct {
 	PlayerID uuid.UUID `json:"player_id"`
 }
 
-// todo: Move this somewhere else
+// Represents a player with a UUID and a name.
 type Player struct {
 	PlayerID uuid.UUID `json:"player_id"`
 	Name     *string   `json:"name"`
@@ -58,11 +59,33 @@ type PlayerJoinedMessage struct {
 	Player Player `json:"player"`
 }
 
+// Message that acknowledges the start of the game for both web and game clients
+// Server -> Web
+// Server -> Game
+type GameStartMessage struct {
+	Message
+	NumberOfJobs int `json:"number_of_jobs"`
+}
+
 // Message containing the information sent by web clients for submitted jobs.
 // Web -> Server
 type JobSubmittedMessage struct {
 	Message
 	JobInput *string `json:"job_input"`
+}
+
+// Represents a job provided to players, contains a UUID and text.
+type Card struct {
+	CardID  uuid.UUID `json:"card_id"`
+	JobText *string   `json:"job_text"`
+}
+
+// Message sent to web clients containing information about the hand they drew and their target job.
+// Server -> Web
+type ReceivedCardsMessage struct {
+	Message
+	DrawnCards []Card `json:"drawn_cards"`
+	JobCard    Card   `json:"job_card"`
 }
 
 // Verifies the integrity of the `LobbyJoinAttemptMessage`, reports errors as required

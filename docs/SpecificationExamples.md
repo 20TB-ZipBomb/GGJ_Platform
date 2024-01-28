@@ -59,19 +59,20 @@ Additionally, any malformed or otherwise improper requests result in a *Connecti
 #### Request
 ```json
 {
-    "message_type": "game_start"
+    "message_type": "game_start",
 }
 ```
 
-#### Response (Web/Server Echoed Back)
+#### Response (Server -> Web & Server -> Game)
 ```json
 {
-    "message_type": "game_start"
+    "message_type": "game_start",
+    "number_of_jobs": "<NUMBER_OF_JOBS_REQUIRED_PER_PLAYER>"
 }
 ```
 
 ### Job Submitted (Web -> Server)
-#### Request (Consumed by the server, no response)
+#### Request (Consumed by the server, no immediate response)
 ```json
 {
     "message_type": "job_submitted",
@@ -79,4 +80,31 @@ Additionally, any malformed or otherwise improper requests result in a *Connecti
 }
 ```
 
-###
+### Player Job Submitting Finished (Server -> Game)
+#### Response (Sent when individual web clients submit the required number of jobs)
+```json
+{
+    "message_type": "player_job_submitting_finished",
+    "player_id": "<PLAYER_UUID>"
+}
+```
+
+### Received Cards (Server -> Web / Server -> Game)
+#### Response (Server -> Web)
+```json
+{
+    "message_type": "received_cards",
+    "drawn_cards": {
+        "card_id": "<CARD_ID>",
+        "job_text": "<JOB_CARD_TEXT>"
+    },
+    "job_card": "<USER_JOB_CARD>"
+}
+```
+
+#### Response (Server -> Game)
+```json
+{
+    "message_type": "received_cards"
+}
+```
