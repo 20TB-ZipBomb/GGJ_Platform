@@ -10,7 +10,7 @@ import (
 	"github.com/20TB-ZipBomb/GGJ_Platform/pkg/network"
 )
 
-var ip = flag.String("ip", "localhost", "target ip address")
+var ip = flag.String("ip", "", "target ip address")
 var port = flag.Int("port", 4040, "target port")
 var env = flag.String("env", "dev", "server environment")
 var verbose = flag.Bool("verbose", false, "enables verbose logging")
