@@ -16,7 +16,13 @@ func Init() {
 	encoderConfig := useEnvEncoderConfig()
 	encoderConfig.StacktraceKey = ""
 	encoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.DateTime)
-	encoderConfig.EncodeLevel = zapcore.LowercaseColorLevelEncoder
+
+	if !utils.IsProductionEnv() {
+		encoderConfig.EncodeLevel = zapcore.LowercaseColorLevelEncoder
+	} else {
+		encoderConfig.EncodeLevel = zapcore.LowercaseLevelEncoder
+	}
+
 	config.EncoderConfig = encoderConfig
 
 	logger, err := config.Build(zap.AddCallerSkip(1))

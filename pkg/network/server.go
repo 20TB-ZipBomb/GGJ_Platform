@@ -266,32 +266,30 @@ func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubm
 		}()
 
 		// Send a message to the web indicating that players are receiving shuffled job cards
-		go func() {
-			s.gameState.DealJobsToPlayers()
+		s.gameState.DealJobsToPlayers()
 
-			for cl := range s.lobby.webClients {
-				uuidCards := s.gameState.PlayersToSubmittedJobs[cl.UUID]
-				drawnCards := uuidCards[0:(len(uuidCards) - 1)]
-				jobCard := uuidCards[len(uuidCards)-1]
+		for cl := range s.lobby.webClients {
+			uuidCards := s.gameState.PlayersToDealtJobs[cl.UUID]
+			drawnCards := uuidCards[0:(len(uuidCards) - 1)]
+			jobCard := uuidCards[len(uuidCards)-1]
 
-				// Set the player state inside the game state
-				s.gameState.CreatePlayerStateWithUUID(cl.UUID, drawnCards, jobCard)
+			// Set the player state inside the game state
+			s.gameState.CreatePlayerStateWithUUID(cl.UUID, drawnCards, jobCard)
 
-				rcmWeb := pack.ReceivedCardsMessage{
-					Message: pack.Message{
-						MessageType: pack.ReceivedCards,
-					},
-					DrawnCards: drawnCards,
-					JobCard:    jobCard,
-				}
-
-				rcmData := json.MarshalJSONBytes[pack.ReceivedCardsMessage](&rcmWeb)
-				cl.lobby.dmSocket <- &SocketDMRequest{
-					DestSocket: cl.conn,
-					Data:       rcmData,
-				}
+			rcmWeb := pack.ReceivedCardsMessage{
+				Message: pack.Message{
+					MessageType: pack.ReceivedCards,
+				},
+				DrawnCards: drawnCards,
+				JobCard:    jobCard,
 			}
-		}()
+
+			rcmData := json.MarshalJSONBytes[pack.ReceivedCardsMessage](&rcmWeb)
+			cl.lobby.dmSocket <- &SocketDMRequest{
+				DestSocket: cl.conn,
+				Data:       rcmData,
+			}
+		}
 	}
 }
 
@@ -334,7 +332,7 @@ func (s *WebSocketServer) handleCardInterception(c *websocket.Conn, icd pack.Car
 	}
 
 	if err := icd.Verify(); err != nil {
-		logger.Warnf("[server] Interception card submission failure: %v", err)
+		logger.Warnf("[server Interception card submission failure: %v", err)
 		return
 	}
 
@@ -419,35 +417,37 @@ func (s *WebSocketServer) handleScoreSubmission(c *websocket.Conn, ss pack.Score
 
 	client.lobby.unicastGame <- json.MarshalJSONBytes[pack.PlayerIDMessage](&pidm)
 
-	// Set a brief timer for some buffer time between messages
-	timer := time.NewTimer(waitingTimeBetweenRoundsSeconds)
-	<-timer.C
+	go func() {
+		// Set a brief timer for some buffer time between messages
+		timer := time.NewTimer(waitingTimeBetweenRoundsSeconds)
+		<-timer.C
 
-	// Update the improv order to only contain the last items if moving to next improv
-	if s.gameState.HaveAllUsersSubmittedScoresForLastImprov() {
-		if len(s.gameState.PlayerImprovOrder) > 0 {
-			s.gameState.PlayerImprovOrder = s.gameState.PlayerImprovOrder[1:]
-			// If the queue has at least one person left, perform another round of improv
-			if len(s.gameState.PlayerImprovOrder) >= 1 {
-				// Before starting the next improv send the cumulative score
-				ss := pack.ScoreSubmissionMessage{
-					Message: pack.Message{
-						MessageType: pack.ScoreSubmission,
-					},
-					ScoreInCents: lastPresenter.ScoreInCents,
+		// Update the improv order to only contain the last items if moving to next improv
+		if s.gameState.HaveAllUsersSubmittedScoresForLastImprov() {
+			if len(s.gameState.PlayerImprovOrder) > 0 {
+				s.gameState.PlayerImprovOrder = s.gameState.PlayerImprovOrder[1:]
+				// If the queue has at least one person left, perform another round of improv
+				if len(s.gameState.PlayerImprovOrder) >= 1 {
+					// Before starting the next improv send the cumulative score
+					ss := pack.ScoreSubmissionMessage{
+						Message: pack.Message{
+							MessageType: pack.ScoreSubmission,
+						},
+						ScoreInCents: lastPresenter.ScoreInCents,
+					}
+					client.lobby.unicastGame <- json.MarshalJSONBytes[pack.ScoreSubmissionMessage](&ss)
+
+					s.startNextImprov(c)
+				} else {
+					gfm := pack.Message{
+						MessageType: pack.GameFinished,
+					}
+
+					client.lobby.broadcast <- json.MarshalJSONBytes[pack.Message](&gfm)
 				}
-				client.lobby.unicastGame <- json.MarshalJSONBytes[pack.ScoreSubmissionMessage](&ss)
-
-				s.startNextImprov(c)
-			} else {
-				gfm := pack.Message{
-					MessageType: pack.GameFinished,
-				}
-
-				client.lobby.broadcast <- json.MarshalJSONBytes[pack.Message](&gfm)
 			}
 		}
-	}
+	}()
 }
 
 // Rejects an incoming connection, responding with a connection rejected message.

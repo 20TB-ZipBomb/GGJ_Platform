@@ -12,7 +12,7 @@ import (
 
 const (
 	// Default starting time fora  round of improv (int)
-	ImprovDefaultStartingTime = 30
+	ImprovDefaultStartingTime = 3
 
 	// Default starting time for a round of improv (seconds)
 	ImprovDefaultStartingTimeSeconds = ImprovDefaultStartingTime * time.Second
@@ -159,7 +159,6 @@ func (s *State) HaveAllUsersFinishedSubmittingJobs() bool {
 func (s *State) HaveAllUsersSelectedAJobForImprov() bool {
 	for _, ps := range s.PlayersToPlayerState {
 		if ps.SelectedCard == nil {
-			logger.Debugf("the person who had %s has not selected", *ps.JobCard)
 			return false
 		}
 	}
@@ -169,7 +168,10 @@ func (s *State) HaveAllUsersSelectedAJobForImprov() bool {
 
 // Checks if all players have submitted a score for the last improv.
 func (s *State) HaveAllUsersSubmittedScoresForLastImprov() bool {
-	// todo: Scuffed, but works
+	if len(s.PlayerImprovOrder) < 0 {
+		return false
+	}
+
 	return s.PlayerImprovOrder[0].NumberOfScoresSubmitted == (len(s.PlayersToSubmittedJobs) - 1)
 }
 
@@ -201,7 +203,8 @@ func (s *State) AddJob(targetUUID uuid.UUID, sj *string) {
 
 // Deals jobs to players.
 func (s *State) DealJobsToPlayers() {
-	rand.Shuffle(len(s.JobPool), func(i, j int) { s.JobPool[i], s.JobPool[j] = s.JobPool[j], s.JobPool[i] })
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r.Shuffle(len(s.JobPool), func(i, j int) { s.JobPool[i], s.JobPool[j] = s.JobPool[j], s.JobPool[i] })
 	logger.Verbosef("Shuffled JobList: %s", s.JobPoolString())
 
 	// Each player gets drawn N cards (where N is the number of clients connected)
@@ -231,7 +234,8 @@ func (s *State) DealJobsToPlayers() {
 // Retrieves the next player for improv.
 func (s *State) GetNextPlayerForImprov() *PlayerState {
 	// Shuffle the ordering
-	rand.Shuffle(len(s.PlayerImprovOrder), func(i, j int) {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r.Shuffle(len(s.PlayerImprovOrder), func(i, j int) {
 		s.PlayerImprovOrder[i], s.PlayerImprovOrder[j] = s.PlayerImprovOrder[j], s.PlayerImprovOrder[i]
 	})
 
