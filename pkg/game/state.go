@@ -12,7 +12,7 @@ import (
 
 const (
 	// Default starting time fora  round of improv (int)
-	ImprovDefaultStartingTime = 3
+	ImprovDefaultStartingTime = 30
 
 	// Default starting time for a round of improv (seconds)
 	ImprovDefaultStartingTimeSeconds = ImprovDefaultStartingTime * time.Second
