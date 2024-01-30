@@ -31,8 +31,7 @@ type State struct {
 	PlayersToSubmittedJobs map[uuid.UUID][]*pack.Card
 	PlayersToDealtJobs     map[uuid.UUID][]*pack.Card
 	PlayersToPlayerState   map[uuid.UUID]*PlayerState
-	PlayerImprovOrder      []*PlayerState
-	ImprovTimer            *time.Timer
+	ImprovSession          *ImprovSession
 }
 
 type PlayerState struct {
@@ -57,8 +56,7 @@ func CreateGameState(uuids []uuid.UUID) *State {
 		PlayersToSubmittedJobs: make(map[uuid.UUID][]*pack.Card),
 		PlayersToDealtJobs:     make(map[uuid.UUID][]*pack.Card),
 		PlayersToPlayerState:   make(map[uuid.UUID]*PlayerState),
-		PlayerImprovOrder:      make([]*PlayerState, 0),
-		ImprovTimer:            nil,
+		ImprovSession:          nil,
 	}
 
 	// Construct the array of jobs for each connected UUID
@@ -90,7 +88,6 @@ func (s *State) CreatePlayerStateWithUUID(uuid uuid.UUID, drawnCards []*pack.Car
 	}
 
 	s.PlayersToPlayerState[uuid] = ps
-	s.PlayerImprovOrder = append(s.PlayerImprovOrder, ps)
 }
 
 // Resets the current game state.
@@ -104,8 +101,7 @@ func (s *State) Reset() {
 	s.PlayersToSubmittedJobs = make(map[uuid.UUID][]*pack.Card)
 	s.PlayersToDealtJobs = make(map[uuid.UUID][]*pack.Card)
 	s.PlayersToPlayerState = make(map[uuid.UUID]*PlayerState)
-	s.PlayerImprovOrder = make([]*PlayerState, 0)
-	s.ImprovTimer = nil
+	s.ImprovSession = nil
 }
 
 // Converts the current job pool array to a string.
@@ -138,6 +134,19 @@ func (s *State) JobUUIDMapToString(jobMap *map[uuid.UUID][]*pack.Card) string {
 	return out
 }
 
+// Returns a slice containing the player states currently on the server.
+func (s *State) GetPlayerStates() []*PlayerState {
+	keys := make([]*PlayerState, len(s.PlayersToPlayerState))
+
+	i := 0
+	for _, v := range s.PlayersToPlayerState {
+		keys[i] = v
+		i++
+	}
+
+	return keys
+}
+
 // Checks if the user with the provided UUID has finished submitting jobs.
 func (s *State) HasUserFinishedSubmittingJobs(uuid uuid.UUID) bool {
 	numJobsSubmitted := len(s.PlayersToSubmittedJobs[uuid])
@@ -166,13 +175,27 @@ func (s *State) HaveAllUsersSelectedAJobForImprov() bool {
 	return true
 }
 
-// Checks if all players have submitted a score for the last improv.
-func (s *State) HaveAllUsersSubmittedScoresForLastImprov() bool {
-	if len(s.PlayerImprovOrder) < 0 {
+// Check if an improv session can be started.
+func (s *State) CheckStartImprov() bool {
+	if !s.HaveAllUsersSelectedAJobForImprov() {
 		return false
 	}
 
-	return s.PlayerImprovOrder[0].NumberOfScoresSubmitted == (len(s.PlayersToSubmittedJobs) - 1)
+	s.ImprovSession = CreateImprovSession(s.GetPlayerStates())
+
+	return true
+}
+
+// Checks if all players have submitted a score for the last improv.
+func (s *State) HaveAllUsersSubmitedScoresForLastImprov() bool {
+	if s.ImprovSession.GetNumberOfPlayersLeftToImprov() < 0 {
+		return false
+	}
+
+	ss := s.ImprovSession.GetNumberOfScoresSubmittedForCurrentPlayer()
+	exceptPlayer := len(s.PlayersToSubmittedJobs) - 1
+
+	return ss == exceptPlayer
 }
 
 // Adds a job to the list of jobs for a user with the passed UUID.
@@ -229,38 +252,4 @@ func (s *State) DealJobsToPlayers() {
 	}
 
 	logger.Debugf("%s", s.JobUUIDMapToString(&s.PlayersToDealtJobs))
-}
-
-// Retrieves the next player for improv.
-func (s *State) GetNextPlayerForImprov() *PlayerState {
-	// Shuffle the ordering
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	r.Shuffle(len(s.PlayerImprovOrder), func(i, j int) {
-		s.PlayerImprovOrder[i], s.PlayerImprovOrder[j] = s.PlayerImprovOrder[j], s.PlayerImprovOrder[i]
-	})
-
-	// The first item in the slice is currently presenting
-	return s.PlayerImprovOrder[0]
-}
-
-type TimerCallback func()
-
-// Starts an improv timer on the server, sends appropriate responses once complete
-func (s *State) StartImprovTimer(cb TimerCallback) {
-	if s.ImprovTimer != nil {
-		logger.Warn("Tried to start a new round of improv but the timer is already going, ignoring.")
-		return
-	}
-
-	s.ImprovTimer = time.NewTimer(ImprovDefaultStartingTimeSeconds)
-	<-s.ImprovTimer.C
-
-	cb()
-
-	s.ImprovTimer = nil
-}
-
-// Resets the improv timer to a time, used during interceptions.
-func (s *State) ResetImprovTimer() {
-	s.ImprovTimer.Reset(ImprovInterceptionAddingTimeSeconds)
 }

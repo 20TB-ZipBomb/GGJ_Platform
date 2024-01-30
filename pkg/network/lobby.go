@@ -40,6 +40,14 @@ func createLobby() *Lobby {
 	}
 }
 
+// Creates a socket DM request.
+func CreateSocketDMRequest(c *websocket.Conn, data []byte) *SocketDMRequest {
+	return &SocketDMRequest{
+		DestSocket: c,
+		Data:       data,
+	}
+}
+
 // Closes the lobby, closing each connected client and the lobby's communication channels.
 func (l *Lobby) closeLobby() {
 	if l == nil {
@@ -88,7 +96,7 @@ func (l *Lobby) run() {
 	}
 }
 
-// Registers a client.
+// Registers a client on the server.
 func (l *Lobby) registerClient(c *Client) {
 	// Map the socket to this client for reverse-lookup later
 	l.socketsToClients[c.conn] = c
@@ -104,7 +112,7 @@ func (l *Lobby) registerClient(c *Client) {
 	}
 }
 
-// Registers a game client and responds with the lobby code.
+// Registers a game client on the server and responds with the lobby code.
 func (l *Lobby) registerGameClient(c *Client) {
 	logger.Verbose("[server] Registered a new Game client.")
 
@@ -157,4 +165,16 @@ func (l *Lobby) unicastToWebClients(msg []byte) {
 // Sends a message directly to a specific socket
 func (l *Lobby) dmTargetSocket(sdr *SocketDMRequest) {
 	sdr.DestSocket.WriteMessage(websocket.TextMessage, sdr.Data)
+}
+
+// Retrieves a client associated with the current socket connection.
+func (l *Lobby) GetClientWithSocket(c *websocket.Conn) *Client {
+	client, ok := l.socketsToClients[c]
+
+	if !ok {
+		logger.Error("[server] Couldn't find a client pertaining to the passed socket.")
+		return nil
+	}
+
+	return client
 }

@@ -20,7 +20,7 @@ const (
 	minimumNumberOfPlayers = 3
 
 	// Waiting time between rounds
-	waitingTimeBetweenRoundsSeconds = 2 * time.Second
+	waitingTimeBetweenRoundsSeconds = 5 * time.Second
 )
 
 type WebSocketServer struct {
@@ -67,18 +67,21 @@ func serveWebSocket(s *WebSocketServer, w http.ResponseWriter, r *http.Request) 
 
 	for {
 		_, msg, err := c.ReadMessage()
+
 		if err != nil {
-			// Filter generic close errors
+			// Filter out generic close errors (e.g., using Ctrl+C in a terminal)
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				logger.Errorf("[server] Error reading message: %v", err)
 			}
 
-			// If the lobby has been created, treat this like a disconnect
+			// If the lobby has been created, treat this codepath like a disconnect
 			if s.lobby != nil && c != nil {
-				if disconnectedClient := s.lobby.socketsToClients[c]; disconnectedClient.clientType == Game {
+				disconnectedClient := s.lobby.GetClientWithSocket(c)
+				if disconnectedClient.clientType == Game {
 					s.lobby.disconnect <- c
 					s.lobby.closeLobby()
 					s.lobby = nil
+
 					if s.gameState != nil {
 						s.gameState.Reset()
 					}
@@ -86,6 +89,7 @@ func serveWebSocket(s *WebSocketServer, w http.ResponseWriter, r *http.Request) 
 					disconnectedClient.closeClient()
 				}
 			}
+
 			break
 		}
 
@@ -210,8 +214,7 @@ func (s *WebSocketServer) doesPassPreRequisites(c *websocket.Conn) bool {
 		return false
 	}
 
-	_, ok := s.lobby.socketsToClients[c]
-	if !ok {
+	if client := s.lobby.GetClientWithSocket(c); client == nil {
 		logger.Warnf("[server] Request to add a job was received, but the connecting socket hasn't registered as a player yet!")
 		return false
 	}
@@ -237,7 +240,7 @@ func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubm
 		return
 	}
 
-	client, _ := s.lobby.socketsToClients[c]
+	client := s.lobby.GetClientWithSocket(c)
 	s.gameState.AddJob(client.UUID, jsm.JobInput)
 
 	// Once the player has submitted the maximum number of jobs, send infomation to the game client
@@ -257,13 +260,10 @@ func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubm
 		logger.Debug("All users have submitted jobs!")
 
 		// Send a message to the game indicating that players are now receiving their cards
-		go func() {
-			rcmGame := pack.Message{
-				MessageType: pack.ReceivedCards,
-			}
-
-			client.lobby.unicastGame <- json.MarshalJSONBytes[pack.Message](&rcmGame)
-		}()
+		rcmGame := pack.Message{
+			MessageType: pack.ReceivedCards,
+		}
+		client.lobby.unicastGame <- json.MarshalJSONBytes[pack.Message](&rcmGame)
 
 		// Send a message to the web indicating that players are receiving shuffled job cards
 		s.gameState.DealJobsToPlayers()
@@ -285,10 +285,7 @@ func (s *WebSocketServer) addJobToGameState(c *websocket.Conn, jsm *pack.JobSubm
 			}
 
 			rcmData := json.MarshalJSONBytes[pack.ReceivedCardsMessage](&rcmWeb)
-			cl.lobby.dmSocket <- &SocketDMRequest{
-				DestSocket: cl.conn,
-				Data:       rcmData,
-			}
+			cl.lobby.dmSocket <- CreateSocketDMRequest(cl.conn, rcmData)
 		}
 	}
 }
@@ -305,7 +302,7 @@ func (s *WebSocketServer) submitCardToGameState(c *websocket.Conn, cd pack.CardD
 	}
 
 	// Send data back to the game client that this player has selected a role for improv
-	client, _ := s.lobby.socketsToClients[c]
+	client := s.lobby.GetClientWithSocket(c)
 	if ps, ok := s.gameState.PlayersToPlayerState[client.UUID]; ok {
 		ps.SelectedCard = cd.Card
 
@@ -319,9 +316,8 @@ func (s *WebSocketServer) submitCardToGameState(c *websocket.Conn, cd pack.CardD
 		client.lobby.unicastGame <- json.MarshalJSONBytes[pack.PlayerIDMessage](&pid)
 	}
 
-	// Check if all players have selected a job for improv
-	if s.gameState.HaveAllUsersSelectedAJobForImprov() {
-		// Start the first round of improv
+	// After each card is submitted, check if improv can be started
+	if s.gameState.CheckStartImprov() {
 		s.startNextImprov(c)
 	}
 }
@@ -337,9 +333,9 @@ func (s *WebSocketServer) handleCardInterception(c *websocket.Conn, icd pack.Car
 	}
 
 	// Reset timer and send interception information back to game client
-	s.gameState.ResetImprovTimer()
+	s.gameState.ImprovSession.ResetSessionTimer(game.ImprovInterceptionAddingTimeSeconds)
 
-	client, _ := s.lobby.socketsToClients[c]
+	client := s.lobby.GetClientWithSocket(c)
 	icm := pack.InterceptionCardMessage{
 		PlayerIDMessage: pack.PlayerIDMessage{
 			Message: pack.Message{
@@ -356,8 +352,7 @@ func (s *WebSocketServer) handleCardInterception(c *websocket.Conn, icd pack.Car
 
 // Gets the next player for improv and starts the improv session.
 func (s *WebSocketServer) startNextImprov(c *websocket.Conn) {
-	client, _ := s.lobby.socketsToClients[c]
-	ps := s.gameState.GetNextPlayerForImprov()
+	ps := s.gameState.ImprovSession.GetCurrentImprovPlayer()
 
 	// Send an improv start message to the game
 	pism := pack.PlayerImprovStartMessage{
@@ -371,8 +366,7 @@ func (s *WebSocketServer) startNextImprov(c *websocket.Conn) {
 		JobCard:       ps.JobCard,
 		TimeInSeconds: int(game.ImprovDefaultStartingTime),
 	}
-
-	client.lobby.unicastGame <- json.MarshalJSONBytes[pack.PlayerImprovStartMessage](&pism)
+	s.lobby.unicastGame <- json.MarshalJSONBytes[pack.PlayerImprovStartMessage](&pism)
 
 	// Send a generic PlayerID to the web client
 	pidm := pack.PlayerIDMessage{
@@ -381,16 +375,15 @@ func (s *WebSocketServer) startNextImprov(c *websocket.Conn) {
 		},
 		PlayerID: ps.UUID,
 	}
-
-	client.lobby.unicastWeb <- json.MarshalJSONBytes[pack.PlayerIDMessage](&pidm)
+	s.lobby.unicastWeb <- json.MarshalJSONBytes[pack.PlayerIDMessage](&pidm)
 
 	// Start the timer since the improv round has begun
-	go s.gameState.StartImprovTimer(func() {
+	go s.gameState.ImprovSession.StartTimerForSession(func() {
 		tfm := pack.Message{
 			MessageType: pack.TimerFinished,
 		}
 
-		client.lobby.broadcast <- json.MarshalJSONBytes[pack.Message](&tfm)
+		s.lobby.broadcast <- json.MarshalJSONBytes[pack.Message](&tfm)
 	})
 }
 
@@ -400,12 +393,9 @@ func (s *WebSocketServer) handleScoreSubmission(c *websocket.Conn, ss pack.Score
 		return
 	}
 
-	client, _ := s.lobby.socketsToClients[c]
+	s.gameState.ImprovSession.SubmitScoreForPlayer(&ss)
 
-	// The first item in the slice was the last presenter, pop it
-	lastPresenter := s.gameState.PlayerImprovOrder[0]
-	lastPresenter.ScoreInCents += ss.ScoreInCents
-	lastPresenter.NumberOfScoresSubmitted += 1
+	client := s.lobby.GetClientWithSocket(c)
 
 	// Send a player ID message to the Game indicating that this player submitted a score
 	pidm := pack.PlayerIDMessage{
@@ -415,39 +405,38 @@ func (s *WebSocketServer) handleScoreSubmission(c *websocket.Conn, ss pack.Score
 		PlayerID: client.UUID,
 	}
 
-	client.lobby.unicastGame <- json.MarshalJSONBytes[pack.PlayerIDMessage](&pidm)
+	s.lobby.unicastGame <- json.MarshalJSONBytes[pack.PlayerIDMessage](&pidm)
 
-	go func() {
-		// Set a brief timer for some buffer time between messages
-		timer := time.NewTimer(waitingTimeBetweenRoundsSeconds)
-		<-timer.C
+	// Set a brief timer for some buffer time between messages
+	timer := time.NewTimer(waitingTimeBetweenRoundsSeconds)
+	<-timer.C
 
-		// Update the improv order to only contain the last items if moving to next improv
-		if s.gameState.HaveAllUsersSubmittedScoresForLastImprov() {
-			if len(s.gameState.PlayerImprovOrder) > 0 {
-				s.gameState.PlayerImprovOrder = s.gameState.PlayerImprovOrder[1:]
-				// If the queue has at least one person left, perform another round of improv
-				if len(s.gameState.PlayerImprovOrder) >= 1 {
-					// Before starting the next improv send the cumulative score
-					ss := pack.ScoreSubmissionMessage{
-						Message: pack.Message{
-							MessageType: pack.ScoreSubmission,
-						},
-						ScoreInCents: lastPresenter.ScoreInCents,
-					}
-					client.lobby.unicastGame <- json.MarshalJSONBytes[pack.ScoreSubmissionMessage](&ss)
-
-					s.startNextImprov(c)
-				} else {
-					gfm := pack.Message{
-						MessageType: pack.GameFinished,
-					}
-
-					client.lobby.broadcast <- json.MarshalJSONBytes[pack.Message](&gfm)
+	// Update the improv order to only contain the last items if moving to next improv
+	if s.gameState.HaveAllUsersSubmitedScoresForLastImprov() {
+		numPlayersLeft := s.gameState.ImprovSession.GetNumberOfPlayersLeftToImprov()
+		if numPlayersLeft > 0 {
+			poppedPlayer := s.gameState.ImprovSession.PopPlayerOnQueue()
+			// If the queue has at least one person left, perform another round of improv
+			if (numPlayersLeft - 1) >= 1 {
+				// Before starting the next improv send the cumulative score
+				ss := pack.ScoreSubmissionMessage{
+					Message: pack.Message{
+						MessageType: pack.ScoreSubmission,
+					},
+					ScoreInCents: poppedPlayer.ScoreInCents,
 				}
+				client.lobby.unicastGame <- json.MarshalJSONBytes[pack.ScoreSubmissionMessage](&ss)
+
+				s.startNextImprov(c)
+			} else {
+				gfm := pack.Message{
+					MessageType: pack.GameFinished,
+				}
+
+				client.lobby.broadcast <- json.MarshalJSONBytes[pack.Message](&gfm)
 			}
 		}
-	}()
+	}
 }
 
 // Rejects an incoming connection, responding with a connection rejected message.
