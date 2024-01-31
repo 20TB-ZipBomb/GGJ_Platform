@@ -53,7 +53,7 @@ func (is *ImprovSession) GetNumberOfScoresSubmittedForCurrentPlayer() int {
 
 // Pops the top player off the improv queue.
 func (is *ImprovSession) PopPlayerOnQueue() *PlayerState {
-	if is.PlayerQueue == nil {
+	if is.PlayerQueue == nil || len(is.PlayerQueue) == 0 {
 		return nil
 	}
 

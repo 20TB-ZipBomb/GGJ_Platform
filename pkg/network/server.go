@@ -413,28 +413,26 @@ func (s *WebSocketServer) handleScoreSubmission(c *websocket.Conn, ss pack.Score
 
 	// Update the improv order to only contain the last items if moving to next improv
 	if s.gameState.HaveAllUsersSubmitedScoresForLastImprov() {
-		numPlayersLeft := s.gameState.ImprovSession.GetNumberOfPlayersLeftToImprov()
-		if numPlayersLeft > 0 {
-			poppedPlayer := s.gameState.ImprovSession.PopPlayerOnQueue()
-			// If the queue has at least one person left, perform another round of improv
-			if (numPlayersLeft - 1) >= 1 {
-				// Before starting the next improv send the cumulative score
-				ss := pack.ScoreSubmissionMessage{
-					Message: pack.Message{
-						MessageType: pack.ScoreSubmission,
-					},
-					ScoreInCents: poppedPlayer.ScoreInCents,
-				}
-				client.lobby.unicastGame <- json.MarshalJSONBytes[pack.ScoreSubmissionMessage](&ss)
+		poppedPlayer := s.gameState.ImprovSession.PopPlayerOnQueue()
 
-				s.startNextImprov(c)
-			} else {
-				gfm := pack.Message{
-					MessageType: pack.GameFinished,
-				}
+		// Before starting the next improv send the cumulative score for the player that just went
+		ss := pack.ScoreSubmissionMessage{
+			Message: pack.Message{
+				MessageType: pack.ScoreSubmission,
+			},
+			ScoreInCents: poppedPlayer.ScoreInCents,
+		}
+		client.lobby.unicastGame <- json.MarshalJSONBytes[pack.ScoreSubmissionMessage](&ss)
 
-				client.lobby.broadcast <- json.MarshalJSONBytes[pack.Message](&gfm)
+		// If the queue has at least one person left, perform another round of improv
+		if s.gameState.ImprovSession.GetNumberOfPlayersLeftToImprov() >= 1 {
+			s.startNextImprov(c)
+		} else {
+			gfm := pack.Message{
+				MessageType: pack.GameFinished,
 			}
+
+			client.lobby.broadcast <- json.MarshalJSONBytes[pack.Message](&gfm)
 		}
 	}
 }
