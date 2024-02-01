@@ -407,10 +407,6 @@ func (s *WebSocketServer) handleScoreSubmission(c *websocket.Conn, ss pack.Score
 
 	s.lobby.unicastGame <- json.MarshalJSONBytes[pack.PlayerIDMessage](&pidm)
 
-	// Set a brief timer for some buffer time between messages
-	timer := time.NewTimer(waitingTimeBetweenRoundsSeconds)
-	<-timer.C
-
 	// Update the improv order to only contain the last items if moving to next improv
 	if s.gameState.HaveAllUsersSubmitedScoresForLastImprov() {
 		poppedPlayer := s.gameState.ImprovSession.PopPlayerOnQueue()
@@ -423,6 +419,10 @@ func (s *WebSocketServer) handleScoreSubmission(c *websocket.Conn, ss pack.Score
 			ScoreInCents: poppedPlayer.ScoreInCents,
 		}
 		client.lobby.unicastGame <- json.MarshalJSONBytes[pack.ScoreSubmissionMessage](&ss)
+
+		// Set a brief timer for some buffer time between rounds or before finishing the game
+		timer := time.NewTimer(waitingTimeBetweenRoundsSeconds)
+		<-timer.C
 
 		// If the queue has at least one person left, perform another round of improv
 		if s.gameState.ImprovSession.GetNumberOfPlayersLeftToImprov() >= 1 {
