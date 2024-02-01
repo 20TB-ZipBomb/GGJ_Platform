@@ -1,0 +1,11 @@
+limits:
+  # (prod-only) Number of players required to start a game
+  minimum_number_of_players: 3
+
+times:
+  # Duration of improv rounds
+  improv_round_duration_seconds: 30
+  # Time added to the round in the event of an interception
+  interception_time_added_seconds: 30
+  # Duration of the intermission/pause between rounds
+  intermission_duration_seconds: 10

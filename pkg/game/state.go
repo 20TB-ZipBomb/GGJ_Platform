@@ -10,28 +10,18 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	// Default starting time fora  round of improv (int)
-	ImprovDefaultStartingTime = 30
-
-	// Default starting time for a round of improv (seconds)
-	ImprovDefaultStartingTimeSeconds = ImprovDefaultStartingTime * time.Second
-
-	// Default time to add to the current timer on interception (int)
-	ImprovInterceptionAddingTime = 30
-
-	// Default time to add to the current timer on interception
-	ImprovInterceptionAddingTimeSeconds = ImprovInterceptionAddingTime * time.Second
-)
+// Note: Opting to load the game's configuration on-mount at the moment
+// since it has less overhead here than adding it to any of the server or state structs.
+var Config *GameConfig = GetGameConfig()
 
 // Maintains the state of the game on the server.
 type State struct {
+	ImprovSession          *ImprovSession
 	JobPool                []*pack.Card
 	JobInputsPerPlayer     int
 	PlayersToSubmittedJobs map[uuid.UUID][]*pack.Card
 	PlayersToDealtJobs     map[uuid.UUID][]*pack.Card
 	PlayersToPlayerState   map[uuid.UUID]*PlayerState
-	ImprovSession          *ImprovSession
 }
 
 type PlayerState struct {
@@ -51,12 +41,12 @@ func CreateGameState(uuids []uuid.UUID) *State {
 	numRequiredJobInputs := numPlayers + 1
 
 	s := &State{
+		ImprovSession:          nil,
 		JobPool:                make([]*pack.Card, 0),
 		JobInputsPerPlayer:     numRequiredJobInputs,
 		PlayersToSubmittedJobs: make(map[uuid.UUID][]*pack.Card),
 		PlayersToDealtJobs:     make(map[uuid.UUID][]*pack.Card),
 		PlayersToPlayerState:   make(map[uuid.UUID]*PlayerState),
-		ImprovSession:          nil,
 	}
 
 	// Construct the array of jobs for each connected UUID
@@ -96,12 +86,12 @@ func (s *State) Reset() {
 		return
 	}
 
+	s.ImprovSession = nil
 	s.JobPool = make([]*pack.Card, 0)
 	s.JobInputsPerPlayer = 0
 	s.PlayersToSubmittedJobs = make(map[uuid.UUID][]*pack.Card)
 	s.PlayersToDealtJobs = make(map[uuid.UUID][]*pack.Card)
 	s.PlayersToPlayerState = make(map[uuid.UUID]*PlayerState)
-	s.ImprovSession = nil
 }
 
 // Converts the current job pool array to a string.

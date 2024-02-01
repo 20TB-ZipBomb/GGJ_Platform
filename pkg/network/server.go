@@ -15,14 +15,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const (
-	// Minimum number of players
-	minimumNumberOfPlayers = 3
-
-	// Waiting time between rounds
-	waitingTimeBetweenRoundsSeconds = 10 * time.Second
-)
-
 type WebSocketServer struct {
 	Addr           string
 	HTTPTimeout    time.Duration
@@ -175,7 +167,8 @@ func (s *WebSocketServer) startGame(c *websocket.Conn) {
 
 	clients := s.lobby.webClients
 	// todo: Remove production environment constraint for minimum number of players?
-	if utils.IsProductionEnv() && len(clients) < minimumNumberOfPlayers {
+	minNumberOfPlayers := game.Config.Limits.MinimumNumberOfPlayers
+	if utils.IsProductionEnv() && len(clients) < minNumberOfPlayers {
 		logger.Warn("Start game request was received, but the lobby has less than the minimum amount of clients connected that are required to play.")
 		rejectConnection(c)
 		return
@@ -297,12 +290,14 @@ func (s *WebSocketServer) handleCardInterception(c *websocket.Conn, icd pack.Car
 		return
 	}
 
+	addedTimeSeconds := game.Config.GetTypedInterceptionTimeAddedSeconds()
+	addedTimeInt := game.Config.Times.InterceptionTimeAddedSeconds
+
 	// Reset timer and send interception information back to game client
-	s.gameState.ImprovSession.ResetSessionTimer(game.ImprovInterceptionAddingTimeSeconds)
+	s.gameState.ImprovSession.ResetSessionTimer(addedTimeSeconds)
 
 	client := s.lobby.GetClientWithSocket(c)
-
-	icm := pack.MarshalInterceptionCardMessage(&client.UUID, icd.Card, game.ImprovInterceptionAddingTime)
+	icm := pack.MarshalInterceptionCardMessage(&client.UUID, icd.Card, addedTimeInt)
 	client.lobby.unicastGame <- icm
 }
 
@@ -311,7 +306,7 @@ func (s *WebSocketServer) startNextImprov(c *websocket.Conn) {
 	ps := s.gameState.ImprovSession.GetCurrentImprovPlayer()
 
 	// Send an improv start message to the game
-	pism := pack.MarshalPlayerImprovStartMessage(&ps.UUID, ps.SelectedCard, ps.JobCard, game.ImprovDefaultStartingTime)
+	pism := pack.MarshalPlayerImprovStartMessage(&ps.UUID, ps.SelectedCard, ps.JobCard, game.Config.Times.ImprovRoundDurationSeconds)
 	s.lobby.unicastGame <- pism
 
 	// Send a generic PlayerID to the web client
@@ -348,7 +343,7 @@ func (s *WebSocketServer) handleScoreSubmission(c *websocket.Conn, ss pack.Score
 		client.lobby.unicastGame <- ss
 
 		// Set a brief timer for some buffer time between rounds or before finishing the game
-		timer := time.NewTimer(waitingTimeBetweenRoundsSeconds)
+		timer := time.NewTimer(game.Config.GetTypedIntermissionDurationSeconds())
 		<-timer.C
 
 		// If the queue has at least one person left, perform another round of improv

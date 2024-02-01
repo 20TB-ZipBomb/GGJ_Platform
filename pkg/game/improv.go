@@ -70,7 +70,9 @@ func (is *ImprovSession) StartTimerForSession(cb ImprovSessionTimerCallback) {
 		return
 	}
 
-	is.SessionTimer = time.NewTimer(ImprovDefaultStartingTimeSeconds)
+	t := Config.GetTypedImprovRoundDurationSeconds()
+	logger.Debugf("TIMER: %s", t.String())
+	is.SessionTimer = time.NewTimer(t)
 	<-is.SessionTimer.C
 
 	cb()
