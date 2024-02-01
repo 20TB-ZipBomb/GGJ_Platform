@@ -22,7 +22,7 @@ type Client struct {
 }
 
 // Creates a game client associated with a particular lobby and connection
-func createClient(l *Lobby, c *websocket.Conn, clientType ClientType) *Client {
+func CreateClient(l *Lobby, c *websocket.Conn, clientType ClientType) *Client {
 	uuid, err := uuid.NewRandom()
 	if err != nil {
 		logger.Errorf("Failed to generate new UUID: %v", err)
@@ -37,7 +37,7 @@ func createClient(l *Lobby, c *websocket.Conn, clientType ClientType) *Client {
 }
 
 // Closes a client and it's corresponding websocket connection.
-func (c *Client) closeClient() {
+func (c *Client) CloseClient() {
 	if c != nil {
 		c.conn.Close()
 	}

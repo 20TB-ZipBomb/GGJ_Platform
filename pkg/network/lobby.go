@@ -24,8 +24,7 @@ type SocketDMRequest struct {
 	Data       []byte
 }
 
-// Creates the lobby and it's communication channels.
-func createLobby() *Lobby {
+func CreateLobby() *Lobby {
 	return &Lobby{
 		hostGameClient:   nil,
 		webClients:       make(map[*Client]bool),
@@ -40,7 +39,6 @@ func createLobby() *Lobby {
 	}
 }
 
-// Creates a socket DM request.
 func CreateSocketDMRequest(c *websocket.Conn, data []byte) *SocketDMRequest {
 	return &SocketDMRequest{
 		DestSocket: c,
@@ -56,9 +54,9 @@ func (l *Lobby) closeLobby() {
 
 	logger.Verbose("[server] Closing lobby.")
 
-	l.hostGameClient.closeClient()
+	l.hostGameClient.CloseClient()
 	for c := range l.webClients {
-		c.closeClient()
+		c.CloseClient()
 	}
 
 	close(l.register)
@@ -116,12 +114,7 @@ func (l *Lobby) registerClient(c *Client) {
 func (l *Lobby) registerGameClient(c *Client) {
 	logger.Verbose("[server] Registered a new Game client.")
 
-	lcm := &pack.LobbyCodeMessage{
-		Message: pack.Message{
-			MessageType: pack.LobbyCode,
-		},
-		LobbyCode: &l.lobbyCode,
-	}
+	lcm := pack.CreateLobbyCodeMessage(&l.lobbyCode)
 
 	// Respond with the lobby code to the game client
 	c.conn.WriteJSON(lcm)
@@ -131,12 +124,7 @@ func (l *Lobby) registerGameClient(c *Client) {
 func (l *Lobby) registerWebClient(c *Client) {
 	logger.Verbose("[server] Registered a new Web client.")
 
-	pidm := &pack.PlayerIDMessage{
-		Message: pack.Message{
-			MessageType: pack.PlayerID,
-		},
-		PlayerID: c.UUID,
-	}
+	pidm := pack.CreatePlayerIDMessage(pack.PlayerID, &c.UUID)
 
 	// Respond with the player ID to the web client.
 	c.conn.WriteJSON(pidm)

@@ -3,6 +3,7 @@ package pack
 import (
 	"errors"
 
+	"github.com/20TB-ZipBomb/GGJ_Platform/internal/utils/json"
 	"github.com/google/uuid"
 )
 
@@ -106,9 +107,9 @@ type CardDataMessage struct {
 // Server -> Game
 type PlayerImprovStartMessage struct {
 	PlayerIDMessage
-	SelectedCard  *Card
-	JobCard       *Card
-	TimeInSeconds int `json:"time_in_seconds"`
+	SelectedCard  *Card `json:"selected_card"`
+	JobCard       *Card `json:"job_card"`
+	TimeInSeconds int   `json:"time_in_seconds"`
 }
 
 // Message sent to and from clients to represent the submission of salary scores in cents
@@ -118,10 +119,32 @@ type ScoreSubmissionMessage struct {
 	ScoreInCents int `json:"score_in_cents"`
 }
 
+// Message sent from the server to game clients to represent a card interception being played.
+// Server -> Game
 type InterceptionCardMessage struct {
 	PlayerIDMessage
 	InterceptedCard *Card `json:"intercepted_card"`
 	TimeInSeconds   int   `json:"time_in_seconds"`
+}
+
+// Creates a Message.
+func CreateBasicMessage(mt MessageType) *Message {
+	return &Message{
+		MessageType: mt,
+	}
+}
+
+// Creates and marshals a Message.
+func MarshalBasicMessage(mt MessageType) []byte {
+	return json.MarshalJSONBytes[Message](CreateBasicMessage(mt))
+}
+
+// Creates a LobbyCodeMessage.
+func CreateLobbyCodeMessage(lc *string) *LobbyCodeMessage {
+	return &LobbyCodeMessage{
+		Message:   *CreateBasicMessage(LobbyCode),
+		LobbyCode: lc,
+	}
 }
 
 // Verifies the integrity of the `LobbyJoinAttemptMessage`, reports errors as required
@@ -141,6 +164,43 @@ func (l *LobbyJoinAttemptMessage) Verify(lc *string) error {
 	return nil
 }
 
+// Creates a PlayerIDMessage.
+func CreatePlayerIDMessage(mt MessageType, uuid *uuid.UUID) *PlayerIDMessage {
+	return &PlayerIDMessage{
+		Message:  *CreateBasicMessage(mt),
+		PlayerID: *uuid,
+	}
+}
+
+// Creates and marshals a PlayerIDMessage.
+func MarshalPlayerIDMessage(mt MessageType, uuid *uuid.UUID) []byte {
+	return json.MarshalJSONBytes[PlayerIDMessage](CreatePlayerIDMessage(mt, uuid))
+}
+
+// Creates a Player.
+func CreatePlayer(uuid *uuid.UUID, name *string) *Player {
+	return &Player{
+		PlayerID: *uuid,
+		Name:     name,
+	}
+}
+
+// Creates a PlayerJoinedMessage.
+func CreatePlayerJoinedMessage(uuid *uuid.UUID, name *string) *PlayerJoinedMessage {
+	return &PlayerJoinedMessage{
+		Message: *CreateBasicMessage(PlayerJoined),
+		Player:  *CreatePlayer(uuid, name),
+	}
+}
+
+// Creates a GameStartMessage.
+func CreateGameStartMessage(n int) *GameStartMessage {
+	return &GameStartMessage{
+		Message:      *CreateBasicMessage(GameStart),
+		NumberOfJobs: n,
+	}
+}
+
 // Verifies the integrity of the `JobSubmittedMessage`, reports errors as required
 func (j *JobSubmittedMessage) Verify() error {
 	if j.JobInput == nil {
@@ -148,6 +208,20 @@ func (j *JobSubmittedMessage) Verify() error {
 	}
 
 	return nil
+}
+
+// Creates a ReceivedCardsMessage.
+func CreateReceivedCardsMessage(dc []*Card, jc *Card) *ReceivedCardsMessage {
+	return &ReceivedCardsMessage{
+		Message:    *CreateBasicMessage(ReceivedCards),
+		DrawnCards: dc,
+		JobCard:    jc,
+	}
+}
+
+// Creates and marshals a ReceivedCardsMessage.
+func MarshalReceivedCardsMessage(dc []*Card, jc *Card) []byte {
+	return json.MarshalJSONBytes[ReceivedCardsMessage](CreateReceivedCardsMessage(dc, jc))
 }
 
 // Verifies the integrity of the `CardDataMessage`, reports errors as required.
@@ -165,4 +239,46 @@ func (c *CardDataMessage) Verify() error {
 	}
 
 	return nil
+}
+
+// Creates a PlayerImprovStartMessage.
+func CreatePlayerImprovStartMessage(uuid *uuid.UUID, sc *Card, jc *Card, t int) *PlayerImprovStartMessage {
+	return &PlayerImprovStartMessage{
+		PlayerIDMessage: *CreatePlayerIDMessage(PlayerImprovStart, uuid),
+		SelectedCard:    sc,
+		JobCard:         jc,
+		TimeInSeconds:   t,
+	}
+}
+
+// Creates and marshals a PlayerImprovStartMessage.
+func MarshalPlayerImprovStartMessage(uuid *uuid.UUID, sc *Card, jc *Card, t int) []byte {
+	return json.MarshalJSONBytes[PlayerImprovStartMessage](CreatePlayerImprovStartMessage(uuid, sc, jc, t))
+}
+
+// Creates a ScoreSubmissionMessage.
+func CreateScoreSubmissionMessage(sc int) *ScoreSubmissionMessage {
+	return &ScoreSubmissionMessage{
+		Message:      *CreateBasicMessage(ScoreSubmission),
+		ScoreInCents: sc,
+	}
+}
+
+// Creates and marshals a ScoreSubmissionMessage.
+func MarshalScoreSubmissionMessage(sc int) []byte {
+	return json.MarshalJSONBytes[ScoreSubmissionMessage](CreateScoreSubmissionMessage(sc))
+}
+
+// Creates an InterceptionCardMessage.
+func CreateInterceptionCardMessage(uuid *uuid.UUID, c *Card, t int) *InterceptionCardMessage {
+	return &InterceptionCardMessage{
+		PlayerIDMessage: *CreatePlayerIDMessage(InterceptionCardData, uuid),
+		InterceptedCard: c,
+		TimeInSeconds:   t,
+	}
+}
+
+// Creates and marshals an InterceptionCardMessage,
+func MarshalInterceptionCardMessage(uuid *uuid.UUID, c *Card, t int) []byte {
+	return json.MarshalJSONBytes[InterceptionCardMessage](CreateInterceptionCardMessage(uuid, c, t))
 }
