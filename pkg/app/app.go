@@ -14,13 +14,17 @@ import (
 var env = flag.String("env", "dev", "server environment")
 var verbose = flag.Bool("verbose", false, "enables verbose logging")
 
+const (
+	envFile = "config/.env"
+)
+
 func Run() {
 	flag.Parse()
 
 	logger.Init()
 	defer logger.Sync()
 
-	if err := godotenv.Load(); err != nil {
+	if err := godotenv.Load(envFile); err != nil {
 		logger.Fatal("Failed to load .env file")
 	}
 

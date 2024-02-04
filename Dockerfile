@@ -10,6 +10,6 @@ FROM alpine:latest AS build-release-stage
 WORKDIR /
 
 COPY --from=build-stage ./ggjp ./
+COPY --from=build-stage ./config ./config
 
-ENV PORT=4040
 ENTRYPOINT [ "./ggjp", "-env", "prod" ]

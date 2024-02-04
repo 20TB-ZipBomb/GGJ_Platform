@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	cfgYamlFileName = "config.yml"
+	cfgYamlFileName = "config/config.yml"
 )
 
 type GameConfig struct {
