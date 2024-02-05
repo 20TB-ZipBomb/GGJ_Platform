@@ -11,6 +11,7 @@ type MessageType string
 
 const (
 	ConnectionRejected    MessageType = "connection_rejected"
+	Alive                             = "alive"
 	CreateLobby                       = "create_lobby"
 	LobbyCode                         = "lobby_code"
 	LobbyJoinAttempt                  = "lobby_join_attempt"

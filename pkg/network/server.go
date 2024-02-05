@@ -23,6 +23,7 @@ type WebSocketServer struct {
 	lobby          *Lobby
 	upgrader       websocket.Upgrader
 	gameState      *game.State
+	pingTimer      *time.Timer
 }
 
 func (server *WebSocketServer) Start() {

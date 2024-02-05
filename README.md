@@ -10,6 +10,8 @@ go run cmd/server/main.go -env dev -verbose
 `.env` files are used to define the environment for the websocket server and are required to deploy/test the server in production.
 
 ```
+# config/.env
+
 # Port to run the local server on
 PORT=
 
